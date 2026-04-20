@@ -1,0 +1,272 @@
+local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
+local FluentKey = loadstring(FluentSource)()
+
+-- Configuração inicial: Copiar link e Notificar
+setclipboard("https://discord.gg/9Ca8b5s7p")
+task.spawn(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Link Copiado",
+        Text = "Link Copiado, Cole no navegador ou Discord Para Obter Key Permanente",
+        Duration = 10
+    })
+end)
+
+-- Janela de Key (Independente para evitar erro de AddTab)
+local KeyWindow = FluentKey:CreateWindow({
+    Title = "Verificação de Acesso",
+    SubTitle = "por HenriqzDev",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(420, 300),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
+
+-- Função para limpar efeitos de iluminação (Shaders)
+local function LimparShaders()
+    for _, v in pairs(game.Lighting:GetChildren()) do
+        if v:IsA("ColorCorrectionEffect") or v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") then
+            v:Destroy()
+        end
+    end
+end
+
+-- Função Principal do Script
+local function IniciarScriptPrincipal()
+    local Fluent = loadstring(FluentSource)() 
+    local HttpService = game:GetService("HttpService")
+    local Player = game.Players.LocalPlayer
+    local Market = game:GetService("MarketplaceService")
+    local FileName = "FeachtData_" .. Player.UserId .. ".json"
+
+    -- Travas para abas dinâmicas
+    _G.MM2TabUnlocked = nil
+    _G.ShaderTabUnlocked = nil
+    _G.DadosTabUnlocked = nil
+
+    local successGame, gameName = pcall(function()
+        return Market:GetProductInfo(game.PlaceId).Name
+    end)
+    if not successGame then gameName = "Desconhecido" end
+
+    local function Save(data)
+        if writefile then writefile(FileName, HttpService:JSONEncode(data)) end
+    end
+
+    local function Load()
+        if isfile and isfile(FileName) then
+            local success, result = pcall(function() return HttpService:JSONDecode(readfile(FileName)) end)
+            if success then return result end
+        end
+        return {Theme = "Dark", Lang = "Português"}
+    end
+
+    local Configs = Load()
+
+    _G.FeachtWindow = Fluent:CreateWindow({
+        Title = "Feacht Dados  🟢  " .. gameName,
+        SubTitle = "v4.0",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(580, 460),
+        Acrylic = false,
+        Theme = Configs.Theme,
+        MinimizeKey = Enum.KeyCode.LeftControl
+    })
+
+    local Tabs = {
+        Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
+        Universal = _G.FeachtWindow:AddTab({ Title = "Universal", Icon = "globe" }),
+        Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" })
+    }
+
+    local WelcomeLabel = Tabs.Home:AddParagraph({ Title = "Carregando...", Content = "..." })
+
+    -- [[ ANTI-AFK SYSTEM ]]
+    Tabs.Home:AddToggle("AntiAfk", {
+        Title = "Anti-AFK System",
+        Default = false,
+        Callback = function(Value)
+            if Value then
+                _G.AntiAfkCon = Player.Idled:Connect(function()
+                    game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                    task.wait(1)
+                    game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                end)
+                Fluent:Notify({Title = "Anti-AFK", Content = "Sistema Ativado!"})
+            else
+                if _G.AntiAfkCon then _G.AntiAfkCon:Disconnect() end
+                Fluent:Notify({Title = "Anti-AFK", Content = "Sistema Desativado."})
+            end
+        end
+    })
+
+    -- [[ ABA UNIVERSAL ]]
+    Tabs.Universal:AddButton({
+        Title = "Infinite Yield",
+        Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end
+    })
+
+    -- BOTÃO PUXAR DADOS
+    Tabs.Universal:AddButton({
+        Title = "Puxar Dados de Jogador",
+        Description = "Procure informações sem asteriscos",
+        Callback = function()
+            if not _G.DadosTabUnlocked then
+                _G.DadosTabUnlocked = true
+                Tabs.Dados = _G.FeachtWindow:AddTab({ Title = "Puxar Dados", Icon = "search" })
+                local InfoParagraph = Tabs.Dados:AddParagraph({ Title = "Resultado", Content = "Digite um nome e clique em Puxar." })
+                
+                local TargetName = ""
+                Tabs.Dados:AddInput("UserLookup", {
+                    Title = "Username",
+                    Placeholder = "Nome do jogador...",
+                    Callback = function(Value) TargetName = Value end
+                })
+
+                Tabs.Dados:AddButton({
+                    Title = "Puxar Dados Agora",
+                    Callback = function()
+                        if TargetName == "" then return end
+                        local success, targetId = pcall(function() return game.Players:GetUserIdFromNameAsync(TargetName) end)
+                        if success then
+                            local info = HttpService:JSONDecode(game:HttpGet("https://users.roblox.com/v1/users/" .. targetId))
+                            local creationDate = info.created:sub(1, 10)
+                            local region = "Desconhecido (Off-server)"
+                            local pInGame = game.Players:FindFirstChild(TargetName)
+                            if pInGame then region = game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(pInGame) end
+
+                            InfoParagraph:SetTitle("Dados de: " .. info.displayName)
+                            InfoParagraph:SetDesc(
+                                "User: @" .. info.name ..
+                                "\nID: " .. targetId ..
+                                "\nCriada em: " .. creationDate ..
+                                "\nPaís: " .. region ..
+                                "\nBaneable: " .. (info.isBanned and "Sim" or "Não")
+                            )
+                        else
+                            Fluent:Notify({Title = "Erro", Content = "Jogador não encontrado!"})
+                        end
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Dados)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Dados)
+            end
+        end
+    })
+
+    -- BOTÃO MM2
+    Tabs.Universal:AddButton({
+        Title = "Murder Mystery 2 (Scripts)",
+        Callback = function()
+            if not _G.MM2TabUnlocked then
+                _G.MM2TabUnlocked = true
+                Tabs.MM2 = _G.FeachtWindow:AddTab({ Title = "Murder Mystery", Icon = "skull" })
+                Tabs.MM2:AddButton({
+                    Title = "Ziya Hub",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Ziya-Hub-81522"))() end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.MM2)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.MM2)
+            end
+        end
+    })
+
+    -- BOTÃO SHADERS
+    Tabs.Universal:AddButton({
+        Title = "Shader System (FX)",
+        Callback = function()
+            if not _G.ShaderTabUnlocked then
+                _G.ShaderTabUnlocked = true
+                Tabs.Shader = _G.FeachtWindow:AddTab({ Title = "Shader", Icon = "camera" })
+                local ShaderSection = Tabs.Shader:AddSection("Presets de Iluminação")
+
+                ShaderSection:AddButton({
+                    Title = "Shader Cinematográfico",
+                    Callback = function()
+                        LimparShaders()
+                        local cc = Instance.new("ColorCorrectionEffect", game.Lighting)
+                        cc.Contrast, cc.Saturation = 0.2, 0.1
+                        Instance.new("BloomEffect", game.Lighting).Intensity = 1
+                        Instance.new("BlurEffect", game.Lighting).Size = 2
+                    end
+                })
+
+                ShaderSection:AddButton({
+                    Title = "Modo Aesthetic",
+                    Callback = function()
+                        LimparShaders()
+                        local cc = Instance.new("ColorCorrectionEffect", game.Lighting)
+                        cc.TintColor = Color3.fromRGB(255, 200, 255)
+                        cc.Saturation = -0.2
+                        Instance.new("BlurEffect", game.Lighting).Size = 4
+                    end
+                })
+
+                ShaderSection:AddButton({ Title = "Tempo: Dia", Callback = function() game.Lighting.ClockTime = 14 end })
+                ShaderSection:AddButton({ Title = "Tempo: Noite", Callback = function() game.Lighting.ClockTime = 0 end })
+                ShaderSection:AddButton({ Title = "Resetar Shaders", Callback = function() LimparShaders(); game.Lighting.ClockTime = 14 end })
+                
+                _G.FeachtWindow:SelectTab(Tabs.Shader)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Shader)
+            end
+        end
+    })
+
+    -- Ajustes de Tema
+    Tabs.Ajuste:AddDropdown("ThemeSelect", {
+        Title = "Cor do Painel",
+        Values = {"Dark", "Light", "Amethyst", "Aqua", "Rose", "Green", "Vivid", "Black", "Midnight"},
+        Default = Configs.Theme,
+        Callback = function(Value)
+            Configs.Theme = Value
+            Save(Configs)
+            pcall(function() Fluent:SetTheme(Value) end)
+        end
+    })
+
+    -- Loop de Status (FPS e Ping)
+    task.spawn(function()
+        while task.wait(1) do
+            local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
+            local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            WelcomeLabel:SetTitle("Bem-vindo, " .. Player.Name)
+            WelcomeLabel:SetDesc("ID: "..Player.UserId.."\nFPS: "..fps.." | Ping: "..ping.."ms")
+        end
+    end)
+
+    _G.FeachtWindow:SelectTab(1)
+    Fluent:Notify({Title = "Sucesso", Content = "Menu Feacht Dados Carregado!"})
+end
+
+-- LÓGICA DA KEY
+KeyTab:AddParagraph({ 
+    Title = "Chave de Acesso", 
+    Content = "O Link do Discord já Foi Copiado, entre no Nosso Discord e Pegue a key!" 
+})
+
+KeyTab:AddInput("InputKey", {
+    Title = "Senha",
+    Placeholder = "Insira a key aqui...",
+    Finished = true, 
+    Callback = function(Value)
+        if Value == "2508" then
+            KeyWindow:Destroy() 
+            task.wait(0.2)
+            IniciarScriptPrincipal() 
+        else
+            if Value ~= "" then
+                FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
+            end
+        end
+    end
+})
+
+KeyTab:AddButton({
+    Title = "Copiar Link Novamente",
+    Callback = function() setclipboard("https://discord.gg/9Ca8b5s7p") end
+})
