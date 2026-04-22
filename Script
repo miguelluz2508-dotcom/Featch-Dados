@@ -1,6 +1,15 @@
 local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
 local FluentKey = loadstring(FluentSource)()
 
+-- [[ CONFIGURAÇÃO DO WEBHOOK ]]
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1496146531038925041/T2HpSCP5Nf4mAS1RzkkHnW8-SbZvSg7-onn80NpXyrC3FvjB6qfn30zr6i8AbqJHTTYt"
+
+-- Variável para o tempo de entrada
+local ServerStartTime = tick() - time()
+local Player = game.Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local CooldownFile = "Sugestoes_Cooldown_" .. Player.UserId .. ".json"
+
 -- Configuração inicial: Copiar link e Notificar
 setclipboard("https://discord.gg/9Ca8b5s7p")
 task.spawn(function()
@@ -11,7 +20,7 @@ task.spawn(function()
     })
 end)
 
--- Janela de Key (Independente para evitar erro de AddTab)
+-- Janela de Key
 local KeyWindow = FluentKey:CreateWindow({
     Title = "Verificação de Acesso",
     SubTitle = "por HenriqzDev",
@@ -24,7 +33,24 @@ local KeyWindow = FluentKey:CreateWindow({
 
 local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
 
--- Função para limpar efeitos de iluminação (Shaders)
+-- Funções Auxiliares de Sugestão
+local function PodeEnviarSugestao()
+    if isfile and isfile(CooldownFile) then
+        local success, data = pcall(function() return HttpService:JSONDecode(readfile(CooldownFile)) end)
+        if success and data.LastDate == os.date("%x") then
+            return false
+        end
+    end
+    return true
+end
+
+local function SalvarDataEnvio()
+    if writefile then
+        writefile(CooldownFile, HttpService:JSONEncode({LastDate = os.date("%x")}))
+    end
+end
+
+-- Função para limpar efeitos de iluminação
 local function LimparShaders()
     for _, v in pairs(game.Lighting:GetChildren()) do
         if v:IsA("ColorCorrectionEffect") or v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") then
@@ -36,15 +62,15 @@ end
 -- Função Principal do Script
 local function IniciarScriptPrincipal()
     local Fluent = loadstring(FluentSource)() 
-    local HttpService = game:GetService("HttpService")
-    local Player = game.Players.LocalPlayer
     local Market = game:GetService("MarketplaceService")
+    local TeleportService = game:GetService("TeleportService")
     local FileName = "FeachtData_" .. Player.UserId .. ".json"
 
-    -- Travas para abas dinâmicas
+    -- Travas de abas dinâmicas
     _G.MM2TabUnlocked = nil
     _G.ShaderTabUnlocked = nil
     _G.DadosTabUnlocked = nil
+    _G.SintoniaTabUnlocked = nil
 
     local successGame, gameName = pcall(function()
         return Market:GetProductInfo(game.PlaceId).Name
@@ -72,34 +98,26 @@ local function IniciarScriptPrincipal()
         Size = UDim2.fromOffset(580, 460),
         Acrylic = false,
         Theme = Configs.Theme,
+        TabSearch = true, -- Ativa a barrinha de pesquisa que você pediu
         MinimizeKey = Enum.KeyCode.LeftControl
     })
 
     local Tabs = {
         Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
         Universal = _G.FeachtWindow:AddTab({ Title = "Universal", Icon = "globe" }),
+        Sugestoes = _G.FeachtWindow:AddTab({ Title = "Sugestões", Icon = "message-square" }),
         Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" })
     }
 
     local WelcomeLabel = Tabs.Home:AddParagraph({ Title = "Carregando...", Content = "..." })
 
-    -- [[ ANTI-AFK SYSTEM ]]
-    Tabs.Home:AddToggle("AntiAfk", {
-        Title = "Anti-AFK System",
-        Default = false,
-        Callback = function(Value)
-            if Value then
-                _G.AntiAfkCon = Player.Idled:Connect(function()
-                    game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                    task.wait(1)
-                    game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                end)
-                Fluent:Notify({Title = "Anti-AFK", Content = "Sistema Ativado!"})
-            else
-                if _G.AntiAfkCon then _G.AntiAfkCon:Disconnect() end
-                Fluent:Notify({Title = "Anti-AFK", Content = "Sistema Desativado."})
-            end
-        end
+    -- [[ SEÇÃO SERVER NA HOME ]]
+    local ServerSection = Tabs.Home:AddSection("Server")
+    local ServerTimeLabel = ServerSection:AddParagraph({ Title = "Tempo no Servidor", Content = "Calculando..." })
+
+    ServerSection:AddButton({
+        Title = "Rejoin Server",
+        Callback = function() TeleportService:Teleport(game.PlaceId, Player) end
     })
 
     -- [[ ABA UNIVERSAL ]]
@@ -108,23 +126,38 @@ local function IniciarScriptPrincipal()
         Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end
     })
 
+    -- BOTÃO SINTONIA RP
+    Tabs.Universal:AddButton({
+        Title = "Sintonia Rp (Scripts)",
+        Callback = function()
+            if not _G.SintoniaTabUnlocked then
+                _G.SintoniaTabUnlocked = true
+                Tabs.Sintonia = _G.FeachtWindow:AddTab({ Title = "Sintonia Rp", Icon = "radio" })
+                Tabs.Sintonia:AddButton({
+                    Title = "Carregar Sintonia RP Script",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/SEASON-2-Sintonia-RP-Fx-Hub-194182"))() end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Sintonia)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Sintonia)
+            end
+        end
+    })
+
     -- BOTÃO PUXAR DADOS
     Tabs.Universal:AddButton({
         Title = "Puxar Dados de Jogador",
-        Description = "Procure informações sem asteriscos",
         Callback = function()
             if not _G.DadosTabUnlocked then
                 _G.DadosTabUnlocked = true
                 Tabs.Dados = _G.FeachtWindow:AddTab({ Title = "Puxar Dados", Icon = "search" })
                 local InfoParagraph = Tabs.Dados:AddParagraph({ Title = "Resultado", Content = "Digite um nome e clique em Puxar." })
-                
                 local TargetName = ""
                 Tabs.Dados:AddInput("UserLookup", {
                     Title = "Username",
                     Placeholder = "Nome do jogador...",
                     Callback = function(Value) TargetName = Value end
                 })
-
                 Tabs.Dados:AddButton({
                     Title = "Puxar Dados Agora",
                     Callback = function()
@@ -132,21 +165,8 @@ local function IniciarScriptPrincipal()
                         local success, targetId = pcall(function() return game.Players:GetUserIdFromNameAsync(TargetName) end)
                         if success then
                             local info = HttpService:JSONDecode(game:HttpGet("https://users.roblox.com/v1/users/" .. targetId))
-                            local creationDate = info.created:sub(1, 10)
-                            local region = "Desconhecido (Off-server)"
-                            local pInGame = game.Players:FindFirstChild(TargetName)
-                            if pInGame then region = game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(pInGame) end
-
                             InfoParagraph:SetTitle("Dados de: " .. info.displayName)
-                            InfoParagraph:SetDesc(
-                                "User: @" .. info.name ..
-                                "\nID: " .. targetId ..
-                                "\nCriada em: " .. creationDate ..
-                                "\nPaís: " .. region ..
-                                "\nBaneable: " .. (info.isBanned and "Sim" or "Não")
-                            )
-                        else
-                            Fluent:Notify({Title = "Erro", Content = "Jogador não encontrado!"})
+                            InfoParagraph:SetDesc("User: @" .. info.name .. "\nID: " .. targetId .. "\nCriada em: " .. info.created:sub(1,10))
                         end
                     end
                 })
@@ -175,44 +195,92 @@ local function IniciarScriptPrincipal()
         end
     })
 
-    -- BOTÃO SHADERS
+    -- ABA SHADERS
     Tabs.Universal:AddButton({
         Title = "Shader System (FX)",
         Callback = function()
             if not _G.ShaderTabUnlocked then
                 _G.ShaderTabUnlocked = true
                 Tabs.Shader = _G.FeachtWindow:AddTab({ Title = "Shader", Icon = "camera" })
-                local ShaderSection = Tabs.Shader:AddSection("Presets de Iluminação")
-
-                ShaderSection:AddButton({
-                    Title = "Shader Cinematográfico",
-                    Callback = function()
-                        LimparShaders()
-                        local cc = Instance.new("ColorCorrectionEffect", game.Lighting)
-                        cc.Contrast, cc.Saturation = 0.2, 0.1
-                        Instance.new("BloomEffect", game.Lighting).Intensity = 1
-                        Instance.new("BlurEffect", game.Lighting).Size = 2
-                    end
+                Tabs.Shader:AddButton({
+                    Title = "Ativar Heavy Shaders",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Heavy-Shaders-158350"))() end
                 })
-
-                ShaderSection:AddButton({
-                    Title = "Modo Aesthetic",
-                    Callback = function()
-                        LimparShaders()
-                        local cc = Instance.new("ColorCorrectionEffect", game.Lighting)
-                        cc.TintColor = Color3.fromRGB(255, 200, 255)
-                        cc.Saturation = -0.2
-                        Instance.new("BlurEffect", game.Lighting).Size = 4
-                    end
+                Tabs.Shader:AddButton({ 
+                    Title = "Resetar Shaders", 
+                    Callback = function() LimparShaders(); game.Lighting.ClockTime = 14 end 
                 })
-
-                ShaderSection:AddButton({ Title = "Tempo: Dia", Callback = function() game.Lighting.ClockTime = 14 end })
-                ShaderSection:AddButton({ Title = "Tempo: Noite", Callback = function() game.Lighting.ClockTime = 0 end })
-                ShaderSection:AddButton({ Title = "Resetar Shaders", Callback = function() LimparShaders(); game.Lighting.ClockTime = 14 end })
-                
                 _G.FeachtWindow:SelectTab(Tabs.Shader)
             else
                 _G.FeachtWindow:SelectTab(Tabs.Shader)
+            end
+        end
+    })
+
+    -- [[ ABA SUGESTÕES ]]
+    local SugestaoTexto = ""
+    Tabs.Sugestoes:AddInput("InputSugestao", {
+        Title = "Enviar Sugestão",
+        Placeholder = "Escreva sua ideia aqui...",
+        Callback = function(Value) SugestaoTexto = Value end
+    })
+
+    Tabs.Sugestoes:AddButton({
+        Title = "Enviar para HenriqzDev",
+        Description = "Limite de 1 por dia",
+        Callback = function()
+            if SugestaoTexto == "" or #SugestaoTexto < 5 then
+                return Fluent:Notify({Title = "Erro", Content = "Sugestão muito curta!"})
+            end
+
+            if not PodeEnviarSugestao() then
+                return Fluent:Notify({Title = "Aviso", Content = "Você já enviou uma sugestão hoje!"})
+            end
+
+            local requestFunc = syn and syn.request or http_request or request or HttpService.Request
+            if requestFunc then
+                requestFunc({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({
+                        ["embeds"] = {{
+                            ["title"] = "📩 Nova Sugestão Recebida",
+                            ["description"] = "```" .. SugestaoTexto .. "```",
+                            ["color"] = 0x00FF00,
+                            ["fields"] = {
+                                {["name"] = "Jogador", ["value"] = Player.Name .. " (" .. Player.UserId .. ")", ["inline"] = true},
+                                {["name"] = "Jogo", ["value"] = gameName, ["inline"] = true}
+                            }
+                        }}
+                    })
+                })
+                SalvarDataEnvio()
+                Fluent:Notify({Title = "Sucesso", Content = "Sugestão enviada ao Discord!"})
+            end
+        end
+    })
+
+    -- Seção de Desenvolvedor nas Sugestões
+    local DevSection = Tabs.Sugestoes:AddSection("Painel do Desenvolvedor")
+    local DevInputKey = ""
+    DevSection:AddInput("DevKey", {
+        Title = "Key de Desenvolvedor",
+        Placeholder = "Digite para ver logs...",
+        Callback = function(Value) DevInputKey = Value end
+    })
+
+    DevSection:AddButton({
+        Title = "Verificar Logs",
+        Callback = function()
+            if DevInputKey == "250814" then
+                local LogPara = Tabs.Sugestoes:AddParagraph({ 
+                    Title = "Status de Logs", 
+                    Content = "Sincronizado com Discord. Novas sugestões aparecem no canal a cada minuto." 
+                })
+                Fluent:Notify({Title = "Bem-vindo", Content = "Acesso de Desenvolvedor liberado!"})
+            else
+                Fluent:Notify({Title = "Erro", Content = "Key de Desenvolvedor incorreta!"})
             end
         end
     })
@@ -229,26 +297,25 @@ local function IniciarScriptPrincipal()
         end
     })
 
-    -- Loop de Status (FPS e Ping)
+    -- Loop de Status
     task.spawn(function()
         while task.wait(1) do
             local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
             local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            local totalSeconds = math.floor(time())
+            local hours = math.floor(totalSeconds / 3600)
+            local minutes = math.floor((totalSeconds % 3600) / 60)
+            local seconds = totalSeconds % 60
             WelcomeLabel:SetTitle("Bem-vindo, " .. Player.Name)
             WelcomeLabel:SetDesc("ID: "..Player.UserId.."\nFPS: "..fps.." | Ping: "..ping.."ms")
+            ServerTimeLabel:SetDesc(string.format("%02d:%02d:%02d", hours, minutes, seconds))
         end
     end)
 
     _G.FeachtWindow:SelectTab(1)
-    Fluent:Notify({Title = "Sucesso", Content = "Menu Feacht Dados Carregado!"})
 end
 
--- LÓGICA DA KEY
-KeyTab:AddParagraph({ 
-    Title = "Chave de Acesso", 
-    Content = "O Link do Discord já Foi Copiado, entre no Nosso Discord e Pegue a key!" 
-})
-
+-- LÓGICA DA KEY DE ACESSO (2508)
 KeyTab:AddInput("InputKey", {
     Title = "Senha",
     Placeholder = "Insira a key aqui...",
@@ -258,15 +325,8 @@ KeyTab:AddInput("InputKey", {
             KeyWindow:Destroy() 
             task.wait(0.2)
             IniciarScriptPrincipal() 
-        else
-            if Value ~= "" then
-                FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
-            end
+        elseif Value ~= "" then
+            FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
         end
     end
-})
-
-KeyTab:AddButton({
-    Title = "Copiar Link Novamente",
-    Callback = function() setclipboard("https://discord.gg/9Ca8b5s7p") end
 })
