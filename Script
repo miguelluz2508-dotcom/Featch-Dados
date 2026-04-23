@@ -9,6 +9,7 @@ local ServerStartTime = tick() - time()
 local Player = game.Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local CooldownFile = "Sugestoes_Cooldown_" .. Player.UserId .. ".json"
+local KeySaveFile = "FeachtKey_" .. Player.UserId .. ".json"
 
 -- Tabela de logs local para sincronização imediata
 _G.SugestoesSessao = _G.SugestoesSessao or {}
@@ -40,19 +41,6 @@ task.spawn(function()
     })
 end)
 
--- Janela de Key
-local KeyWindow = FluentKey:CreateWindow({
-    Title = "Verificação de Acesso",
-    SubTitle = "por HenriqzDev",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(420, 300),
-    Acrylic = false,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
-})
-
-local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
-
 -- Funções Auxiliares de Sugestão
 local function PodeEnviarSugestao()
     if isfile and isfile(CooldownFile) then
@@ -67,6 +55,21 @@ end
 local function SalvarDataEnvio()
     if writefile then
         writefile(CooldownFile, HttpService:JSONEncode({LastDate = os.date("%x")}))
+    end
+end
+
+-- Função para Verificar Key Salva
+local function IsKeyVerified()
+    if isfile and isfile(KeySaveFile) then
+        local success, result = pcall(function() return HttpService:JSONDecode(readfile(KeySaveFile)) end)
+        return success and result.Verified == true
+    end
+    return false
+end
+
+local function SalvarKeyStatus()
+    if writefile then
+        writefile(KeySaveFile, HttpService:JSONEncode({Verified = true}))
     end
 end
 
@@ -128,10 +131,34 @@ local function IniciarScriptPrincipal()
         Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
         Universal = _G.FeachtWindow:AddTab({ Title = "Universal", Icon = "globe" }),
         Sugestoes = _G.FeachtWindow:AddTab({ Title = "Sugestões", Icon = "message-square" }),
-        Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" })
+        Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" }),
+        Creditos = _G.FeachtWindow:AddTab({ Title = "Créditos", Icon = "info" })
     }
 
     local WelcomeLabel = Tabs.Home:AddParagraph({ Title = "Carregando...", Content = "..." })
+
+    -- [[ ABA CRÉDITOS ]]
+    Tabs.Creditos:AddParagraph({ Title = "Desenvolvedor", Content = "Dev: Manoz7_rlq" })
+    Tabs.Creditos:AddParagraph({ Title = "Biblioteca", Content = "Libraly: Fluent" })
+    Tabs.Creditos:AddParagraph({ Title = "Testador", Content = "Tester: h3ito_kkj" })
+
+    local TiktokSection = Tabs.Creditos:AddSection("Tiktok dos Mesmo")
+
+    TiktokSection:AddButton({
+        Title = "Dev Tiktok",
+        Callback = function()
+            setclipboard("@jjjkeasd")
+            Fluent:Notify({Title = "Copiado", Content = "Tiktok do Dev copiado com sucesso!"})
+        end
+    })
+
+    TiktokSection:AddButton({
+        Title = "Tester Tiktok",
+        Callback = function()
+            setclipboard("@nevsxzs_")
+            Fluent:Notify({Title = "Copiado", Content = "Tiktok do Tester copiado com sucesso!"})
+        end
+    })
 
     -- [[ SEÇÃO SERVER NA HOME ]]
     local ServerSection = Tabs.Home:AddSection("Server")
@@ -453,18 +480,36 @@ local function IniciarScriptPrincipal()
     _G.FeachtWindow:SelectTab(1)
 end
 
--- LÓGICA DA KEY DE ACESSO (2508)
-KeyTab:AddInput("InputKey", {
-    Title = "Senha",
-    Placeholder = "Insira a key aqui...",
-    Finished = true, 
-    Callback = function(Value)
-        if Value == "2508" then
-            KeyWindow:Destroy() 
-            task.wait(0.2)
-            IniciarScriptPrincipal() 
-        elseif Value ~= "" then
-            FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
+-- LÓGICA DE INICIALIZAÇÃO COM KEY PERMANENTE
+if IsKeyVerified() then
+    IniciarScriptPrincipal()
+else
+    -- Janela de Key
+    local KeyWindow = FluentKey:CreateWindow({
+        Title = "Verificação de Acesso",
+        SubTitle = "por HenriqzDev",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(420, 300),
+        Acrylic = false,
+        Theme = "Dark",
+        MinimizeKey = Enum.KeyCode.LeftControl
+    })
+
+    local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
+
+    KeyTab:AddInput("InputKey", {
+        Title = "Senha",
+        Placeholder = "Insira a key aqui...",
+        Finished = true, 
+        Callback = function(Value)
+            if Value == "2508" then
+                SalvarKeyStatus() -- Salva para não pedir novamente
+                KeyWindow:Destroy() 
+                task.wait(0.2)
+                IniciarScriptPrincipal() 
+            elseif Value ~= "" then
+                FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
+            end
         end
-    end
-})
+    })
+end
