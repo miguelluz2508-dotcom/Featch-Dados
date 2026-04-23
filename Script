@@ -96,6 +96,7 @@ local function IniciarScriptPrincipal()
     _G.SintoniaTabUnlocked = nil
     _G.NoitesTabUnlocked = nil
     _G.FishTabUnlocked = nil
+    _G.DeadRailsTabUnlocked = nil
 
     local successGame, gameName = pcall(function()
         return Market:GetProductInfo(game.PlaceId).Name
@@ -124,8 +125,51 @@ local function IniciarScriptPrincipal()
         Acrylic = Configs.Acrylic,
         Theme = Configs.Theme,
         TabSearch = true,
-        MinimizeKey = Enum.KeyCode.LeftControl
+        MinimizeKey = Enum.KeyCode.RightShift
     })
+
+    -- [[ INÍCIO: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
+    local ScreenGui = Instance.new("ScreenGui")
+    local OpenButton = Instance.new("TextButton")
+    local UICorner = Instance.new("UICorner")
+
+    ScreenGui.Name = "FeachtToggleGui"
+    ScreenGui.Parent = game.CoreGui
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    OpenButton.Name = "ToggleButton"
+    OpenButton.Parent = ScreenGui
+    OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    OpenButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+    OpenButton.Size = UDim2.new(0, 50, 0, 50)
+    OpenButton.Font = Enum.Font.GothamBold
+    OpenButton.Text = "F"
+    OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    OpenButton.TextSize = 24
+    OpenButton.Active = true
+    OpenButton.Draggable = true 
+
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = OpenButton
+
+    OpenButton.MouseButton1Click:Connect(function()
+        _G.FeachtWindow:Minimize()
+    end)
+
+    task.spawn(function()
+        local FluentUI = game.CoreGui:WaitForChild("Fluent", 5)
+        if FluentUI then
+            FluentUI.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                    ScreenGui:Destroy()
+                end
+            end)
+            FluentUI.Destroying:Connect(function()
+                ScreenGui:Destroy()
+            end)
+        end
+    end)
+    -- [[ FIM: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
 
     local Tabs = {
         Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
@@ -192,6 +236,27 @@ local function IniciarScriptPrincipal()
                 _G.FeachtWindow:SelectTab(Tabs.Noites)
             else
                 _G.FeachtWindow:SelectTab(Tabs.Noites)
+            end
+        end
+    })
+
+    -- BOTÃO DEAD RAILS
+    Tabs.Universal:AddButton({
+        Title = "Dead Rails",
+        Callback = function()
+            if not _G.DeadRailsTabUnlocked then
+                _G.DeadRailsTabUnlocked = true
+                Tabs.DeadRails = _G.FeachtWindow:AddTab({ Title = "Dead Rails", Icon = "skull" })
+                Tabs.DeadRails:AddButton({
+                    Title = "Carregar Script Dead Rails",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://rawscripts.net/raw/Dead-Rails-Beta-Best-script-dead-rails-204535"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script Dead Rails Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.DeadRails)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.DeadRails)
             end
         end
     })
@@ -434,7 +499,8 @@ local function IniciarScriptPrincipal()
         Callback = function(Value)
             Configs.Theme = Value
             Save(Configs)
-            pcall(function() _G.FeachtWindow:SetTheme(Value) end)
+            -- FIX: Mudança de tema agora aplicada forçadamente
+            Fluent:SetTheme(Value)
         end
     })
 
@@ -492,7 +558,7 @@ else
         Size = UDim2.fromOffset(420, 300),
         Acrylic = false,
         Theme = "Dark",
-        MinimizeKey = Enum.KeyCode.LeftControl
+        MinimizeKey = Enum.KeyCode.RightShift
     })
 
     local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
