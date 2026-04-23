@@ -1,4 +1,4 @@
-Local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
+local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
 local FluentKey = loadstring(FluentSource)()
 
 -- [[ CONFIGURAÇÃO DO WEBHOOK ]]
@@ -92,6 +92,7 @@ local function IniciarScriptPrincipal()
     _G.DadosTabUnlocked = nil
     _G.SintoniaTabUnlocked = nil
     _G.NoitesTabUnlocked = nil
+    _G.FishTabUnlocked = nil
 
     local successGame, gameName = pcall(function()
         return Market:GetProductInfo(game.PlaceId).Name
@@ -107,7 +108,7 @@ local function IniciarScriptPrincipal()
             local success, result = pcall(function() return HttpService:JSONDecode(readfile(FileName)) end)
             if success then return result end
         end
-        return {Theme = "Dark", Lang = "Português"}
+        return {Theme = "Dark", Lang = "Português", Acrylic = false, Transparency = 0}
     end
 
     local Configs = Load()
@@ -117,7 +118,7 @@ local function IniciarScriptPrincipal()
         SubTitle = "v4.0",
         TabWidth = 160,
         Size = UDim2.fromOffset(580, 460),
-        Acrylic = false,
+        Acrylic = Configs.Acrylic,
         Theme = Configs.Theme,
         TabSearch = true,
         MinimizeKey = Enum.KeyCode.LeftControl
@@ -150,24 +151,41 @@ local function IniciarScriptPrincipal()
     -- BOTÃO 99 NOITES NA FLORESTA
     Tabs.Universal:AddButton({
         Title = "99 Noites na Floresta",
-        Description = "Abre a aba de scripts para 99 Noites",
         Callback = function()
             if not _G.NoitesTabUnlocked then
                 _G.NoitesTabUnlocked = true
                 Tabs.Noites = _G.FeachtWindow:AddTab({ Title = "99 Noites", Icon = "moon" })
-                
                 Tabs.Noites:AddButton({
                     Title = "Carregar Script 99 Noites",
-                    Description = "Executa o script fornecido",
                     Callback = function()
                         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-99-Noites-na-Floresta-87445"))()
                         Fluent:Notify({Title = "Sucesso", Content = "Script 99 Noites Carregado!"})
                     end
                 })
-                
                 _G.FeachtWindow:SelectTab(Tabs.Noites)
             else
                 _G.FeachtWindow:SelectTab(Tabs.Noites)
+            end
+        end
+    })
+
+    -- BOTÃO FISH
+    Tabs.Universal:AddButton({
+        Title = "Fish",
+        Callback = function()
+            if not _G.FishTabUnlocked then
+                _G.FishTabUnlocked = true
+                Tabs.Fish = _G.FeachtWindow:AddTab({ Title = "Fish", Icon = "waves" })
+                Tabs.Fish:AddButton({
+                    Title = "Carregar Script Fish",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/KAN-FISCH/tesss/refs/heads/main/gunung/fish.lua"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script Fish Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Fish)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Fish)
             end
         end
     })
@@ -275,19 +293,14 @@ local function IniciarScriptPrincipal()
 
     Tabs.Sugestoes:AddButton({
         Title = "Enviar para HenriqzDev",
-        Description = "Filtro de palavrões e sincronização imediata ativos",
         Callback = function()
             if SugestaoTexto == "" or #SugestaoTexto < 5 then
                 return Fluent:Notify({Title = "Erro", Content = "Sugestão muito curta!"})
             end
-
             if not PodeEnviarSugestao() then
                 return Fluent:Notify({Title = "Aviso", Content = "Você já enviou uma sugestão hoje!"})
             end
-
-            -- Aplica o Filtro de Palavrões antes de enviar
             local TextoFinal = FiltrarTexto(SugestaoTexto)
-
             local requestFunc = syn and syn.request or http_request or request or HttpService.Request
             if requestFunc then
                 requestFunc({
@@ -307,8 +320,6 @@ local function IniciarScriptPrincipal()
                     })
                 })
                 SalvarDataEnvio()
-                
-                -- Sincronização Imediata pros logs do desenvolvedor
                 table.insert(_G.SugestoesSessao, "[" .. os.date("%H:%M") .. "] " .. Player.Name .. ": " .. TextoFinal)
                 if LogPara then
                     local lista = ""
@@ -318,13 +329,11 @@ local function IniciarScriptPrincipal()
                     end
                     LogPara:SetDesc("Últimas sugestões sincronizadas:\n" .. lista)
                 end
-
                 Fluent:Notify({Title = "Sucesso", Content = "Sugestão enviada e filtrada!"})
             end
         end
     })
 
-    -- Seção de Desenvolvedor nas Sugestões
     local DevSection = Tabs.Sugestoes:AddSection("Painel do Desenvolvedor")
     local DevInputKey = ""
     DevSection:AddInput("DevKey", {
@@ -350,15 +359,79 @@ local function IniciarScriptPrincipal()
         end
     })
 
-    -- Ajustes de Tema
-    Tabs.Ajuste:AddDropdown("ThemeSelect", {
-        Title = "Cor do Painel",
+    -- [[ ABA AJUSTES ]]
+    local SystemSection = Tabs.Ajuste:AddSection("Otimização do Sistema")
+
+    SystemSection:AddToggle("AntiAFK", {
+        Title = "Anti-AFK System",
+        Default = false,
+        Callback = function(Value)
+            _G.AntiAFK = Value
+            if Value then
+                local vu = game:GetService("VirtualUser")
+                Player.Idled:Connect(function()
+                    if _G.AntiAFK then
+                        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+                        wait(1)
+                        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+                    end
+                end)
+                Fluent:Notify({Title = "Anti-AFK", Content = "Ativado com sucesso!"})
+            end
+        end
+    })
+
+    SystemSection:AddButton({
+        Title = "Ant Lag (FPS Boost)",
+        Callback = function()
+            for _, v in pairs(game:GetDescendants()) do
+                if v:IsA("BasePart") and not v:IsA("MeshPart") then
+                    v.Material = "SmoothPlastic"
+                    v.Reflectance = 0
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v:Destroy()
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                    v.Enabled = false
+                end
+            end
+            Fluent:Notify({Title = "Ant Lag", Content = "Texturas e efeitos simplificados!"})
+        end
+    })
+
+    local UISection = Tabs.Ajuste:AddSection("Interface do Painel")
+
+    UISection:AddDropdown("ThemeSelect", {
+        Title = "Tema",
         Values = {"Dark", "Light", "Amethyst", "Aqua", "Rose", "Green", "Vivid", "Black", "Midnight"},
         Default = Configs.Theme,
         Callback = function(Value)
             Configs.Theme = Value
             Save(Configs)
-            pcall(function() Fluent:SetTheme(Value) end)
+            pcall(function() _G.FeachtWindow:SetTheme(Value) end)
+        end
+    })
+
+    UISection:AddToggle("AcrylicToggle", {
+        Title = "Efeito de Desfoque (Acrylic)",
+        Default = Configs.Acrylic,
+        Callback = function(Value)
+            Configs.Acrylic = Value
+            Save(Configs)
+            _G.FeachtWindow:SetAcrylic(Value)
+        end
+    })
+
+    UISection:AddSlider("TransparencySlider", {
+        Title = "Transparência do Painel",
+        Description = "Ajuste a visibilidade do fundo",
+        Default = Configs.Transparency or 0,
+        Min = 0,
+        Max = 100,
+        Rounding = 0,
+        Callback = function(Value)
+            Configs.Transparency = Value
+            Save(Configs)
+            _G.FeachtWindow:SetTransparency(Value / 100)
         end
     })
 
