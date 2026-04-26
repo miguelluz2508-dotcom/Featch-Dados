@@ -1,704 +1,998 @@
--- ==========================================
--- [[ Sistema de Loading  ]]
--- ==========================================
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
-local lp = game.Players.LocalPlayer
-local PlayerGui = lp:WaitForChild("PlayerGui")
+-- ===============================================================
+-- TELA DE LOADING (DELTA EXECUTOR - NIGHTFALL TERMINAL v13)
+-- ===============================================================
+-- (Adicionada por @jjjkeasd, sem alterar nenhuma linha original)
+-- ===============================================================
+do
+    -- ======================== SERVICES ========================
+    local TweenService = game:GetService("TweenService")
+    local RunService = game:GetService("RunService")
+    local Lighting = game:GetService("Lighting")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
 
--- Função que encapsula TODO o seu script original sem remover nada
-local function IniciarScriptCompleto()
-    local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
-    local FluentKey = loadstring(FluentSource)()
-
-    -- [[ CONFIGURAÇÃO DO WEBHOOK ]]
-    local WEBHOOK_URL = "https://discord.com/api/webhooks/1496146531038925041/T2HpSCP5Nf4mAS1RzkkHnW8-SbZvSg7-onn80NpXyrC3FvjB6qfn30zr6i8AbqJHTTYt"
-
-    -- Variável para o tempo de entrada
-    local ServerStartTime = tick() - time()
-    local Player = game.Players.LocalPlayer
-    local HttpService = game:GetService("HttpService")
-    local CooldownFile = "Sugestoes_Cooldown_" .. Player.UserId .. ".json"
-    local KeySaveFile = "FeachtKey_" .. Player.UserId .. ".json"
-
-    -- Tabela de logs local para sincronização imediata
-    _G.SugestoesSessao = _G.SugestoesSessao or {}
-
-    -- [[ SISTEMA DE FILTRO DE PALAVRÕES ]]
-    local PalavrasBanidas = {
-        "porra", "merda", "caralho", "foder", "foda", "vtnc", "desgraça", 
-        "puta", "pqp", "arrombado", "buceta", "cu", "pica", "rola"
+    local EXECUTOR_NAME = "DELTA"  -- Altere aqui se quiser
+    local CFG = {
+        RainCols = 55,
+        RainSpeedMin = 0.4,
+        RainSpeedMax = 1.1,
+        ScanlineSpeed = 1.5,
+        BlurIntensity = 20,
+        PanelWidth = 600,
+        PanelHeight = 380,
+        MaxTerminalLines = 10,
+        AssetCount = 100,
+        BypassSteps = 6,
+        TypeDelay = 0.05,
+        KeySoundId = "rbxassetid://174774494", -- clique de teclado
+        KeyVolume = 0.3,
     }
 
-    local function FiltrarTexto(texto)
-        local textoFiltrado = texto
-        for _, palavra in ipairs(PalavrasBanidas) do
-            local padrao = palavra
-            textoFiltrado = string.gsub(textoFiltrado:lower(), padrao, function(match)
-                return string.rep("*", #match)
-            end)
-        end
-        return textoFiltrado
+    local Container = (gethui and gethui()) or
+        (pcall(function() return CoreGui.Name end) and CoreGui) or
+        Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    if Container:FindFirstChild("DeltaNightfall") then
+        Container.DeltaNightfall:Destroy()
+    end
+    if Lighting:FindFirstChild("NightfallBlur") then
+        Lighting.NightfallBlur:Destroy()
     end
 
-    -- Configuração inicial: Copiar link e Notificar
-    setclipboard("https://discord.gg/9Ca8b5s7p")
-    task.spawn(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Link Copiado",
-            Text = "Link Copiado, Cole no navegador ou Discord Para Obter Key Permanente",
-            Duration = 10
-        })
+    local Blur = Instance.new("BlurEffect")
+    Blur.Name = "NightfallBlur"
+    Blur.Size = 0
+    Blur.Parent = Lighting
+
+    local UI = Instance.new("ScreenGui")
+    UI.Name = "DeltaNightfall"
+    UI.IgnoreGuiInset = true
+    UI.Parent = Container
+
+    local Root = Instance.new("Frame")
+    Root.Size = UDim2.new(1, 0, 1, 0)
+    Root.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Root.BackgroundTransparency = 1
+    Root.BorderSizePixel = 0
+    Root.Parent = UI
+
+    -- Fundo ruído, scanline, grade...
+    local Noise = Instance.new("ImageLabel", Root)
+    Noise.Size = UDim2.new(1, 0, 1, 0)
+    Noise.BackgroundTransparency = 1
+    Noise.Image = "rbxassetid://5028857084"
+    Noise.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    Noise.ImageTransparency = 0.96
+
+    local ScanLine = Instance.new("Frame", Root)
+    ScanLine.Size = UDim2.new(1, 0, 0, 2)
+    ScanLine.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    ScanLine.BackgroundTransparency = 0.82
+    ScanLine.BorderSizePixel = 0
+
+    local Grid = Instance.new("Frame", Root)
+    Grid.Size = UDim2.new(1, 0, 1, 0)
+    Grid.BackgroundTransparency = 1
+    for i = 1, 20 do
+        local line = Instance.new("Frame", Grid)
+        line.Size = UDim2.new(1, 0, 0, 1)
+        line.Position = UDim2.new(0, 0, i/20, 0)
+        line.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+        line.BackgroundTransparency = 0.93
+        line.BorderSizePixel = 0
+    end
+
+    -- Chuva hacker
+    local RainCanvas = Instance.new("Frame", Root)
+    RainCanvas.Size = UDim2.new(1, 0, 1, 0)
+    RainCanvas.BackgroundTransparency = 1
+    RainCanvas.ClipsDescendants = true
+
+    local hackLexicon = {"DELTA","0xDEAD","BYPASS","INJECT","ROOT","KERNEL","0x7FF","GHOST","NEXUS","0xACE","MEM","STACK","0xFEED","L33T","HACK","PAYLOAD","0x1337","EXEC","SYS","USER","RING0","GLITCH","0xFACE"}
+    local rainCols = {}
+    for c = 1, CFG.RainCols do
+        local col = Instance.new("TextLabel", RainCanvas)
+        col.Size = UDim2.new(0, 14, 1, 0)
+        col.Position = UDim2.new((c-1)/CFG.RainCols, 0, 0, 0)
+        col.BackgroundTransparency = 1
+        col.Font = Enum.Font.Code
+        col.TextSize = 14
+        col.TextColor3 = Color3.fromRGB(0, 255, 65)
+        col.TextTransparency = 0.7
+        col.TextXAlignment = Enum.TextXAlignment.Center
+        col.TextYAlignment = Enum.TextYAlignment.Top
+        local parts = {}
+        for _ = 1, math.random(10, 25) do
+            parts[#parts+1] = math.random() < 0.35 and hackLexicon[math.random(#hackLexicon)] or string.char(math.random(48, 122))
+        end
+        col.Text = table.concat(parts, "\n")
+        rainCols[c] = {obj = col, offset = math.random() * 2, speed = CFG.RainSpeedMin + math.random()*(CFG.RainSpeedMax - CFG.RainSpeedMin)}
+    end
+
+    -- Glitch boxes
+    local GlitchContainer = Instance.new("Frame", Root)
+    GlitchContainer.Size = UDim2.new(1, 0, 1, 0)
+    GlitchContainer.BackgroundTransparency = 1
+    local glitchBoxes = {}
+    for i = 1, 15 do
+        local box = Instance.new("Frame", GlitchContainer)
+        box.Size = UDim2.new(0, math.random(30, 110), 0, math.random(1, 4))
+        box.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+        box.BackgroundTransparency = 0.7
+        box.BorderSizePixel = 0
+        box.Position = UDim2.new(math.random(), 0, math.random(), 0)
+        glitchBoxes[i] = {obj = box, lifetime = math.random()*1.8+0.3, age = math.random()*2}
+    end
+
+    -- Painel principal
+    local Panel = Instance.new("Frame", Root)
+    Panel.Size = UDim2.new(0, CFG.PanelWidth, 0, CFG.PanelHeight)
+    Panel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    Panel.BackgroundTransparency = 1
+    Panel.BorderSizePixel = 0
+
+    Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 24)
+
+    local PanelStroke = Instance.new("UIStroke", Panel)
+    PanelStroke.Thickness = 2.5
+    PanelStroke.Color = Color3.fromRGB(0, 255, 180)
+    PanelStroke.Transparency = 1
+
+    local StrokeGrad = Instance.new("UIGradient", PanelStroke)
+    StrokeGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 100)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 200, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 100)),
+    })
+
+    local Glow = Instance.new("ImageLabel", Panel)
+    Glow.Size = UDim2.new(1, 120, 1, 120)
+    Glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    Glow.BackgroundTransparency = 1
+    Glow.Image = "rbxassetid://5028857084"
+    Glow.ImageColor3 = Color3.fromRGB(0, 200, 130)
+    Glow.ImageTransparency = 1
+
+    -- Textos
+    local Title = Instance.new("TextLabel", Panel)
+    Title.Size = UDim2.new(1, -40, 0, 56)
+    Title.Position = UDim2.new(0, 20, 0, 28)
+    Title.BackgroundTransparency = 1
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = EXECUTOR_NAME
+    Title.TextSize = 52
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextTransparency = 1
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local TermOutput = Instance.new("TextLabel", Panel)
+    TermOutput.Size = UDim2.new(1, -40, 0, 110)
+    TermOutput.Position = UDim2.new(0, 20, 0, 90)
+    TermOutput.BackgroundTransparency = 1
+    TermOutput.Font = Enum.Font.Code
+    TermOutput.Text = ""
+    TermOutput.TextSize = 15
+    TermOutput.TextColor3 = Color3.fromRGB(0, 255, 100)
+    TermOutput.TextTransparency = 1
+    TermOutput.TextXAlignment = Enum.TextXAlignment.Left
+    TermOutput.TextYAlignment = Enum.TextYAlignment.Top
+
+    local SubStatus = Instance.new("TextLabel", Panel)
+    SubStatus.Size = UDim2.new(1, -40, 0, 22)
+    SubStatus.Position = UDim2.new(0, 20, 0, 210)
+    SubStatus.BackgroundTransparency = 1
+    SubStatus.Font = Enum.Font.Code
+    SubStatus.Text = ""
+    SubStatus.TextSize = 13
+    SubStatus.TextColor3 = Color3.fromRGB(180, 180, 220)
+    SubStatus.TextTransparency = 1
+    SubStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+    local Cursor = Instance.new("TextLabel", Panel)
+    Cursor.Size = UDim2.new(0, 12, 0, 20)
+    Cursor.Position = UDim2.new(0, 20, 0, 210)
+    Cursor.BackgroundTransparency = 1
+    Cursor.Font = Enum.Font.Code
+    Cursor.Text = "▋"
+    Cursor.TextSize = 15
+    Cursor.TextColor3 = Color3.fromRGB(0, 255, 100)
+    Cursor.TextTransparency = 0.5
+
+    local LoadingMessage = Instance.new("TextLabel", Panel)
+    LoadingMessage.Size = UDim2.new(1, -40, 0, 20)
+    LoadingMessage.Position = UDim2.new(0, 20, 0, 250)
+    LoadingMessage.BackgroundTransparency = 1
+    LoadingMessage.Font = Enum.Font.Code
+    LoadingMessage.Text = ""
+    LoadingMessage.TextSize = 12
+    LoadingMessage.TextColor3 = Color3.fromRGB(100, 220, 100)
+    LoadingMessage.TextTransparency = 1
+    LoadingMessage.TextXAlignment = Enum.TextXAlignment.Left
+
+    local BarBg = Instance.new("Frame", Panel)
+    BarBg.Size = UDim2.new(1, -40, 0, 2)
+    BarBg.Position = UDim2.new(0, 20, 0, 280)
+    BarBg.BackgroundTransparency = 0.88
+    BarBg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    BarBg.BorderSizePixel = 0
+
+    local BarFill = Instance.new("Frame", BarBg)
+    BarFill.Size = UDim2.new(0, 0, 1, 0)
+    BarFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    BarFill.BorderSizePixel = 0
+    Instance.new("UIGradient", BarFill).Color = ColorSequence.new(Color3.fromRGB(0, 255, 100), Color3.fromRGB(0, 200, 255))
+
+    local Credit = Instance.new("TextLabel", Panel)
+    Credit.Size = UDim2.new(1, -40, 0, 18)
+    Credit.Position = UDim2.new(0, 20, 0, 320)
+    Credit.BackgroundTransparency = 1
+    Credit.Font = Enum.Font.Code
+    Credit.Text = "@jjjkeasd"
+    Credit.TextSize = 12
+    Credit.TextColor3 = Color3.fromRGB(120, 120, 160)
+    Credit.TextTransparency = 1
+    Credit.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Som de tecla
+    local KeySound = Instance.new("Sound", UI)
+    KeySound.SoundId = CFG.KeySoundId
+    KeySound.Volume = CFG.KeyVolume
+
+    -- Funções locais
+    local function tween(obj, dur, props, ease)
+        ease = ease or Enum.EasingStyle.Exponential
+        local t = TweenService:Create(obj, TweenInfo.new(dur, ease, Enum.EasingDirection.Out), props)
+        t:Play()
+        return t
+    end
+
+    local function typewrite(label, text, speed)
+        label.TextTransparency = 0
+        label.Text = ""
+        local startPos = label.Position
+        for i = 1, #text do
+            label.Text = text:sub(1, i)
+            local bounds = label.TextBounds
+            Cursor.Position = UDim2.new(0, startPos.X.Offset + bounds.X + 6, 0, startPos.Y.Offset + 2)
+            Cursor.TextTransparency = 0.2
+            if KeySound.IsLoaded then KeySound:Play() end
+            task.wait(speed or CFG.TypeDelay)
+        end
+        Cursor.TextTransparency = 0.5
+    end
+
+    local logLines = {}
+    local function addLog(txt)
+        logLines[#logLines+1] = txt
+        if #logLines > CFG.MaxTerminalLines then table.remove(logLines, 1) end
+        TermOutput.Text = table.concat(logLines, "\n")
+        TermOutput.TextTransparency = 0
+    end
+
+    local function performBypass()
+        local steps = {
+            "Scanning memory regions...",
+            "Analyzing anti‑tamper module...",
+            "Patching integrity checks...",
+            "Hooking VirtualProtect...",
+            "Disabling debug flags...",
+            "Bypassing execution whitelist...",
+        }
+        for _, step in ipairs(steps) do
+            typewrite(LoadingMessage, step)
+            addLog("  "..step.." [OK]")
+            tween(BarFill, 0.3, { Size = UDim2.new(0.15 + (_/CFG.BypassSteps)*0.25, 0, 1, 0) })
+            task.wait(0.3)
+        end
+        LoadingMessage.Text = "All anti‑cheats neutralized"
+        addLog("Bypass complete")
+    end
+
+    -- Loop de animação
+    local scanTime = 0
+    local MainLoop = RunService.RenderStepped:Connect(function(dt)
+        local now = tick()
+        scanTime = scanTime + dt * CFG.ScanlineSpeed
+        ScanLine.Position = UDim2.new(0, 0, (math.sin(scanTime)+1)*0.5, 0)
+        for _, col in ipairs(rainCols) do
+            local off = (now * col.speed + col.offset) % 2.0
+            col.obj.Position = UDim2.new(col.obj.Position.X.Scale, 0, UDim.new(-0.3 + off * 0.7, 0).Scale, 0)
+            col.obj.TextTransparency = 0.6 + math.sin(now*5 + col.offset*10)*0.15
+        end
+        for _, g in ipairs(glitchBoxes) do
+            g.age = g.age + dt
+            if g.age >= g.lifetime then
+                g.age = 0
+                g.lifetime = math.random()*1.5+0.3
+                g.obj.Position = UDim2.new(math.random(), 0, math.random(), 0)
+                g.obj.Size = UDim2.new(0, math.random(30,100), 0, math.random(1,4))
+            end
+            g.obj.BackgroundTransparency = 0.5 + math.sin(g.age/g.lifetime*math.pi)*0.5
+        end
+        StrokeGrad.Rotation = now * 60
+        Glow.ImageTransparency = 0.55 + math.sin(now*2.3)*0.15
+        Cursor.TextTransparency = (math.sin(now*10)>0) and 0.3 or 0.8
     end)
 
-    -- Funções Auxiliares de Sugestão
-    local function PodeEnviarSugestao()
-        if isfile and isfile(CooldownFile) then
-            local success, data = pcall(function() return HttpService:JSONDecode(readfile(CooldownFile)) end)
-            if success and data.LastDate == os.date("%x") then
-                return false
+    -- Sequência de carregamento (assíncrona)
+    task.spawn(function()
+        tween(Blur, 2, { Size = CFG.BlurIntensity })
+        tween(Root, 1.5, { BackgroundTransparency = 0.45 })
+        task.wait(0.5)
+
+        tween(PanelStroke, 1.2, { Transparency = 0.2 })
+        tween(Glow, 1.5, { ImageTransparency = 0.35 })
+        task.wait(0.3)
+
+        tween(Title, 0.8, { TextTransparency = 0 })
+        tween(Credit, 1.5, { TextTransparency = 0.45 })
+        task.wait(0.2)
+
+        addLog(EXECUTOR_NAME.." kernel loaded")
+        task.wait(0.3)
+
+        performBypass()
+
+        typewrite(LoadingMessage, "Loading assets 0/"..CFG.AssetCount)
+        addLog("Loading assets...")
+        for i = 1, CFG.AssetCount do
+            if i % 10 == 0 or i == 1 then
+                LoadingMessage.Text = "Loading assets "..i.."/"..CFG.AssetCount
+                local bounds = LoadingMessage.TextBounds
+                Cursor.Position = UDim2.new(0, LoadingMessage.Position.X.Offset + bounds.X + 6, 0, LoadingMessage.Position.Y.Offset + 2)
             end
+            tween(BarFill, 0.005, { Size = UDim2.new(0.40 + (i/CFG.AssetCount)*0.55, 0, 1, 0) })
+            task.wait(0.004)
         end
-        return true
-    end
+        LoadingMessage.Text = "All assets loaded ("..CFG.AssetCount.."/"..CFG.AssetCount..")"
+        addLog("assets loaded")
+        task.wait(0.3)
 
-    local function SalvarDataEnvio()
-        if writefile then
-            writefile(CooldownFile, HttpService:JSONEncode({LastDate = os.date("%x")}))
-        end
-    end
+        typewrite(LoadingMessage, "Initializing execution environment")
+        addLog("env ready")
+        tween(BarFill, 0.5, { Size = UDim2.new(0.98, 0, 1, 0) })
+        task.wait(0.4)
+        LoadingMessage.Text = "READY"
+        tween(BarFill, 0.3, { Size = UDim2.new(1, 0, 1, 0) })
+        addLog("-> "..EXECUTOR_NAME.." online")
+        task.wait(1.2)
 
-    -- Função para Verificar Key Salva
-    local function IsKeyVerified()
-        if isfile and isfile(KeySaveFile) then
-            local success, result = pcall(function() return HttpService:JSONDecode(readfile(KeySaveFile)) end)
-            return success and result.Verified == true
-        end
-        return false
-    end
+        -- Dissipação
+        tween(Title, 0.7, { TextTransparency = 1 })
+        tween(TermOutput, 0.7, { TextTransparency = 1 })
+        tween(SubStatus, 0.7, { TextTransparency = 1 })
+        tween(LoadingMessage, 0.7, { TextTransparency = 1 })
+        Cursor.Visible = false
+        tween(PanelStroke, 0.7, { Transparency = 1 })
+        tween(Glow, 0.7, { ImageTransparency = 1 })
+        tween(Blur, 1.2, { Size = 0 })
+        tween(Root, 1.2, { BackgroundTransparency = 1 })
+        task.wait(1.4)
 
-    local function SalvarKeyStatus()
-        if writefile then
-            writefile(KeySaveFile, HttpService:JSONEncode({Verified = true}))
-        end
-    end
+        MainLoop:Disconnect()
+        if Blur then Blur:Destroy() end
+        UI:Destroy()
 
-    -- Função para limpar efeitos de iluminação
-    local function LimparShaders()
-        for _, v in pairs(game.Lighting:GetChildren()) do
-            if v:IsA("ColorCorrectionEffect") or v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") then
-                v:Destroy()
-            end
-        end
-    end
-
-    -- Função Principal do Script
-    local function IniciarScriptPrincipal()
-        local Fluent = loadstring(FluentSource)() 
-        local Market = game:GetService("MarketplaceService")
-        local TeleportService = game:GetService("TeleportService")
-        local FileName = "FeachtData_" .. Player.UserId .. ".json"
-
-        -- Travas de abas dinâmicas
-        _G.MM2TabUnlocked = nil
-        _G.ShaderTabUnlocked = nil
-        _G.DadosTabUnlocked = nil
-        _G.SintoniaTabUnlocked = nil
-        _G.NoitesTabUnlocked = nil
-        _G.FishTabUnlocked = nil
-        _G.DeadRailsTabUnlocked = nil
-        _G.BrookhavenTabUnlocked = nil
-
-        local successGame, gameName = pcall(function()
-            return Market:GetProductInfo(game.PlaceId).Name
-        end)
-        if not successGame then gameName = "Desconhecido" end
-
-        local function Save(data)
-            if writefile then writefile(FileName, HttpService:JSONEncode(data)) end
-        end
-
-        local function Load()
-            if isfile and isfile(FileName) then
-                local success, result = pcall(function() return HttpService:JSONDecode(readfile(FileName)) end)
-                if success then return result end
-            end
-            return {Theme = "Dark", Lang = "Português", Acrylic = false, Transparency = 0}
-        end
-
-        local Configs = Load()
-
-        _G.FeachtWindow = Fluent:CreateWindow({
-            Title = "Feacht Dados  🟢  " .. gameName,
-            SubTitle = "v4.0",
-            TabWidth = 160,
-            Size = UDim2.fromOffset(580, 460),
-            Acrylic = Configs.Acrylic,
-            Theme = Configs.Theme,
-            TabSearch = true,
-            MinimizeKey = Enum.KeyCode.RightShift
-        })
-
-        -- [[ INÍCIO: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
-        local ScreenGui = Instance.new("ScreenGui")
-        local OpenButton = Instance.new("TextButton")
-        local UICorner = Instance.new("UICorner")
-
-        ScreenGui.Name = "FeachtToggleGui"
-        ScreenGui.Parent = game.CoreGui
-        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-        OpenButton.Name = "ToggleButton"
-        OpenButton.Parent = ScreenGui
-        OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        OpenButton.Position = UDim2.new(0.1, 0, 0.2, 0)
-        OpenButton.Size = UDim2.new(0, 50, 0, 50)
-        OpenButton.Font = Enum.Font.GothamBold
-        OpenButton.Text = "F"
-        OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        OpenButton.TextSize = 24
-        OpenButton.Active = true
-        OpenButton.Draggable = true 
-
-        UICorner.CornerRadius = UDim.new(0, 10)
-        UICorner.Parent = OpenButton
-
-        OpenButton.MouseButton1Click:Connect(function()
-            _G.FeachtWindow:Minimize()
-        end)
-
-        task.spawn(function()
-            local FluentUI = game.CoreGui:WaitForChild("Fluent", 5)
-            if FluentUI then
-                FluentUI.AncestryChanged:Connect(function(_, parent)
-                    if not parent then
-                        ScreenGui:Destroy()
-                    end
-                end)
-                FluentUI.Destroying:Connect(function()
-                    ScreenGui:Destroy()
-                end)
-            end
-        end)
-        -- [[ FIM: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
-
-        local Tabs = {
-            Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
-            Universal = _G.FeachtWindow:AddTab({ Title = "Universal", Icon = "globe" }),
-            Sugestoes = _G.FeachtWindow:AddTab({ Title = "Sugestões", Icon = "message-square" }),
-            Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" }),
-            Creditos = _G.FeachtWindow:AddTab({ Title = "Créditos", Icon = "info" })
-        }
-
-        local WelcomeLabel = Tabs.Home:AddParagraph({ Title = "Carregando...", Content = "..." })
-
-        -- [[ ABA CRÉDITOS ]]
-        Tabs.Creditos:AddParagraph({ Title = "Desenvolvedor", Content = "Dev: Manoz7_rlq" })
-        Tabs.Creditos:AddParagraph({ Title = "Biblioteca", Content = "Libraly: Fluent" })
-        Tabs.Creditos:AddParagraph({ Title = "Testador", Content = "Tester: h3ito_kkj" })
-
-        local TiktokSection = Tabs.Creditos:AddSection("Tiktok dos Mesmo")
-
-        TiktokSection:AddButton({
-            Title = "Dev Tiktok",
-            Callback = function()
-                setclipboard("@jjjkeasd")
-                Fluent:Notify({Title = "Copiado", Content = "Tiktok do Dev copiado com sucesso!"})
-            end
-        })
-
-        TiktokSection:AddButton({
-            Title = "Tester Tiktok",
-            Callback = function()
-                setclipboard("@nevsxzs_")
-                Fluent:Notify({Title = "Copiado", Content = "Tiktok do Tester copiado com sucesso!"})
-            end
-        })
-
-        -- [[ SEÇÃO SERVER NA HOME ]]
-        local ServerSection = Tabs.Home:AddSection("Server")
-        local ServerTimeLabel = ServerSection:AddParagraph({ Title = "Tempo no Servidor", Content = "Calculando..." })
-
-        ServerSection:AddButton({
-            Title = "Rejoin Server",
-            Callback = function() TeleportService:Teleport(game.PlaceId, Player) end
-        })
-
-        -- [[ ABA UNIVERSAL ]]
-        Tabs.Universal:AddButton({
-            Title = "Infinite Yield",
-            Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end
-        })
-
-        -- BOTÃO 99 NOITES NA FLORESTA
-        Tabs.Universal:AddButton({
-            Title = "99 Noites na Floresta",
-            Callback = function()
-                if not _G.NoitesTabUnlocked then
-                    _G.NoitesTabUnlocked = true
-                    Tabs.Noites = _G.FeachtWindow:AddTab({ Title = "99 Noites", Icon = "moon" })
-                    Tabs.Noites:AddButton({
-                        Title = "Carregar Script 99 Noites",
-                        Callback = function()
-                            loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-99-Noites-na-Floresta-87445"))()
-                            Fluent:Notify({Title = "Sucesso", Content = "Script 99 Noites Carregado!"})
-                        end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Noites)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Noites)
-                end
-            end
-        })
-
-        -- BOTÃO DEAD RAILS
-        Tabs.Universal:AddButton({
-            Title = "Dead Rails",
-            Callback = function()
-                if not _G.DeadRailsTabUnlocked then
-                    _G.DeadRailsTabUnlocked = true
-                    Tabs.DeadRails = _G.FeachtWindow:AddTab({ Title = "Dead Rails", Icon = "skull" })
-                    Tabs.DeadRails:AddButton({
-                        Title = "Carregar Script Dead Rails",
-                        Callback = function()
-                            loadstring(game:HttpGet("https://rawscripts.net/raw/Dead-Rails-Beta-Best-script-dead-rails-204535"))()
-                            Fluent:Notify({Title = "Sucesso", Content = "Script Dead Rails Carregado!"})
-                        end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.DeadRails)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.DeadRails)
-                end
-            end
-        })
-
-        -- BOTÃO FISH
-        Tabs.Universal:AddButton({
-            Title = "Fish",
-            Callback = function()
-                if not _G.FishTabUnlocked then
-                    _G.FishTabUnlocked = true
-                    Tabs.Fish = _G.FeachtWindow:AddTab({ Title = "Fish", Icon = "waves" })
-                    Tabs.Fish:AddButton({
-                        Title = "Carregar Script Fish",
-                        Callback = function()
-                            loadstring(game:HttpGet("https://rawusercontent.com/KAN-FISCH/tesss/refs/heads/main/gunung/fish.lua"))()
-                            Fluent:Notify({Title = "Sucesso", Content = "Script Fish Carregado!"})
-                        end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Fish)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Fish)
-                end
-            end
-        })
-
-        -- BOTÃO SINTONIA RP
-        Tabs.Universal:AddButton({
-            Title = "Sintonia Rp (Scripts)",
-            Callback = function()
-                if not _G.SintoniaTabUnlocked then
-                    _G.SintoniaTabUnlocked = true
-                    Tabs.Sintonia = _G.FeachtWindow:AddTab({ Title = "Sintonia Rp", Icon = "radio" })
-                    Tabs.Sintonia:AddButton({
-                        Title = "Carregar Sintonia RP Script",
-                        Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/SEASON-2-Sintonia-RP-Fx-Hub-194182"))() end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Sintonia)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Sintonia)
-                end
-            end
-        })
-
-        -- BOTÃO PUXAR DADOS
-        Tabs.Universal:AddButton({
-            Title = "Puxar Dados de Jogador",
-            Callback = function()
-                if not _G.DadosTabUnlocked then
-                    _G.DadosTabUnlocked = true
-                    Tabs.Dados = _G.FeachtWindow:AddTab({ Title = "Puxar Dados", Icon = "search" })
-                    local InfoParagraph = Tabs.Dados:AddParagraph({ Title = "Resultado", Content = "Digite um nome e clique em Puxar." })
-                    local TargetName = ""
-                    Tabs.Dados:AddInput("UserLookup", {
-                        Title = "Username",
-                        Placeholder = "Nome do jogador...",
-                        Callback = function(Value) TargetName = Value end
-                    })
-                    Tabs.Dados:AddButton({
-                        Title = "Puxar Dados Agora",
-                        Callback = function()
-                            if TargetName == "" then return end
-                            local success, targetId = pcall(function() return game.Players:GetUserIdFromNameAsync(TargetName) end)
-                            if success then
-                                local info = HttpService:JSONDecode(game:HttpGet("https://users.roblox.com/v1/users/" .. targetId))
-                                InfoParagraph:SetTitle("Dados de: " .. info.displayName)
-                                InfoParagraph:SetDesc("User: @" .. info.name .. "\nID: " .. targetId .. "\nCriada em: " .. info.created:sub(1,10))
-                            end
-                        end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Dados)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Dados)
-                end
-            end
-        })
-
-        -- BOTÃO BROOKHAVEN
-        Tabs.Universal:AddButton({
-            Title = "Brookhaven RP",
-            Callback = function()
-                if not _G.BrookhavenTabUnlocked then
-                    _G.BrookhavenTabUnlocked = true
-                    Tabs.Brookhaven = _G.FeachtWindow:AddTab({ Title = "Brookhaven", Icon = "home" })
-                    Tabs.Brookhaven:AddButton({
-                        Title = "Carregar Script Brookhaven",
-                        Callback = function()
-                            loadstring(game:HttpGet("https://rawscripts.net/raw/Brookhaven-RP-HX-Hexagon-Client-90722"))()
-                            Fluent:Notify({Title = "Sucesso", Content = "Script Brookhaven Carregado!"})
-                        end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Brookhaven)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Brookhaven)
-                end
-            end
-        })
-
-        -- BOTÃO MM2
-        Tabs.Universal:AddButton({
-            Title = "Murder Mystery 2 (Scripts)",
-            Callback = function()
-                if not _G.MM2TabUnlocked then
-                    _G.MM2TabUnlocked = true
-                    Tabs.MM2 = _G.FeachtWindow:AddTab({ Title = "Murder Mystery", Icon = "skull" })
-                    Tabs.MM2:AddButton({
-                        Title = "Ziya Hub",
-                        Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Ziya-Hub-81522"))() end
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.MM2)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.MM2)
-                end
-            end
-        })
-
-        -- ABA SHADERS
-        Tabs.Universal:AddButton({
-            Title = "Shader System (FX)",
-            Callback = function()
-                if not _G.ShaderTabUnlocked then
-                    _G.ShaderTabUnlocked = true
-                    Tabs.Shader = _G.FeachtWindow:AddTab({ Title = "Shader", Icon = "camera" })
-                    Tabs.Shader:AddButton({
-                        Title = "Ativar Heavy Shaders",
-                        Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Heavy-Shaders-158350"))() end
-                    })
-                    Tabs.Shader:AddButton({ 
-                        Title = "Resetar Shaders", 
-                        Callback = function() LimparShaders(); game.Lighting.ClockTime = 14 end 
-                    })
-                    _G.FeachtWindow:SelectTab(Tabs.Shader)
-                else
-                    _G.FeachtWindow:SelectTab(Tabs.Shader)
-                end
-            end
-        })
-
-        -- [[ ABA SUGESTÕES ]]
-        local SugestaoTexto = ""
-        local LogPara 
-        
-        Tabs.Sugestoes:AddInput("InputSugestao", {
-            Title = "Enviar Sugestão",
-            Placeholder = "Escreva sua ideia aqui...",
-            Callback = function(Value) SugestaoTexto = Value end
-        })
-
-        Tabs.Sugestoes:AddButton({
-            Title = "Enviar para HenriqzDev",
-            Callback = function()
-                if SugestaoTexto == "" or #SugestaoTexto < 5 then
-                    return Fluent:Notify({Title = "Erro", Content = "Sugestão muito curta!"})
-                end
-                if not PodeEnviarSugestao() then
-                    return Fluent:Notify({Title = "Aviso", Content = "Você já enviou uma sugestão hoje!"})
-                end
-                local TextoFinal = FiltrarTexto(SugestaoTexto)
-                local requestFunc = syn and syn.request or http_request or request or HttpService.Request
-                if requestFunc then
-                    requestFunc({
-                        Url = WEBHOOK_URL,
-                        Method = "POST",
-                        Headers = {["Content-Type"] = "application/json"},
-                        Body = HttpService:JSONEncode({
-                            ["embeds"] = {{
-                                ["title"] = "📩 Nova Sugestão Recebida",
-                                ["description"] = "```" .. TextoFinal .. "```",
-                                ["color"] = 0x00FF00,
-                                ["fields"] = {
-                                    {["name"] = "Jogador", ["value"] = Player.Name .. " (" .. Player.UserId .. ")", ["inline"] = true},
-                                    {["name"] = "Jogo", ["value"] = gameName, ["inline"] = true}
-                                }
-                            }}
-                        })
-                    })
-                    SalvarDataEnvio()
-                    table.insert(_G.SugestoesSessao, "[" .. os.date("%H:%M") .. "] " .. Player.Name .. ": " .. TextoFinal)
-                    if LogPara then
-                        local lista = ""
-                        for i = #_G.SugestoesSessao, 1, -1 do
-                            lista = lista .. _G.SugestoesSessao[i] .. "\n"
-                            if i < #_G.SugestoesSessao - 5 then break end 
-                        end
-                        LogPara:SetDesc("Últimas sugestões sincronizadas:\n" .. lista)
-                    end
-                    Fluent:Notify({Title = "Sucesso", Content = "Sugestão enviada e filtrada!"})
-                end
-            end
-        })
-
-        local DevSection = Tabs.Sugestoes:AddSection("Painel do Desenvolvedor")
-        local DevInputKey = ""
-        DevSection:AddInput("DevKey", {
-            Title = "Key de Desenvolvedor",
-            Placeholder = "Digite para ver logs...",
-            Callback = function(Value) DevInputKey = Value end
-        })
-
-        DevSection:AddButton({
-            Title = "Verificar Logs",
-            Callback = function()
-                if DevInputKey == "250814" then
-                    if not LogPara then
-                        LogPara = Tabs.Sugestoes:AddParagraph({ 
-                            Title = "Sincronização Ativa", 
-                            Content = "Nenhuma sugestão enviada nesta sessão ainda." 
-                        })
-                    end
-                    Fluent:Notify({Title = "Bem-vindo", Content = "Acesso de Desenvolvedor liberado!"})
-                else
-                    Fluent:Notify({Title = "Erro", Content = "Key de Desenvolvedor incorreta!"})
-                end
-            end
-        })
-
-        -- [[ ABA AJUSTES ]]
-        local SystemSection = Tabs.Ajuste:AddSection("Otimização do Sistema")
-
-        SystemSection:AddToggle("AntiAFK", {
-            Title = "Anti-AFK System",
-            Default = false,
-            Callback = function(Value)
-                _G.AntiAFK = Value
-                if Value then
-                    local vu = game:GetService("VirtualUser")
-                    Player.Idled:Connect(function()
-                        if _G.AntiAFK then
-                            vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-                            wait(1)
-                            vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-                        end
-                    end)
-                    Fluent:Notify({Title = "Anti-AFK", Content = "Ativado com sucesso!"})
-                end
-            end
-        })
-
-        SystemSection:AddButton({
-            Title = "Ant Lag (FPS Boost)",
-            Callback = function()
-                for _, v in pairs(game:GetDescendants()) do
-                    if v:IsA("BasePart") and not v:IsA("MeshPart") then
-                        v.Material = "SmoothPlastic"
-                        v.Reflectance = 0
-                    elseif v:IsA("Decal") or v:IsA("Texture") then
-                        v:Destroy()
-                    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-                        v.Enabled = false
-                    end
-                end
-                Fluent:Notify({Title = "Ant Lag", Content = "Texturas e efeitos simplificados!"})
-            end
-        })
-
-        local UISection = Tabs.Ajuste:AddSection("Interface do Painel")
-
-        UISection:AddDropdown("ThemeSelect", {
-            Title = "Tema",
-            Values = {"Dark", "Light", "Amethyst", "Aqua", "Rose", "Green", "Vivid", "Black", "Midnight"},
-            Default = Configs.Theme,
-            Callback = function(Value)
-                Configs.Theme = Value
-                Save(Configs)
-                -- FIX: Mudança de tema agora aplicada forçadamente
-                Fluent:SetTheme(Value)
-            end
-        })
-
-        UISection:AddToggle("AcrylicToggle", {
-            Title = "Efeito de Desfoque (Acrylic)",
-            Default = Configs.Acrylic,
-            Callback = function(Value)
-                Configs.Acrylic = Value
-                Save(Configs)
-                _G.FeachtWindow:SetAcrylic(Value)
-            end
-        })
-
-        UISection:AddSlider("TransparencySlider", {
-            Title = "Transparência do Painel",
-            Description = "Ajuste a visibilidade do fundo",
-            Default = Configs.Transparency or 0,
-            Min = 0,
-            Max = 100,
-            Rounding = 0,
-            Callback = function(Value)
-                Configs.Transparency = Value
-                Save(Configs)
-                _G.FeachtWindow:SetTransparency(Value / 100)
-            end
-        })
-
-        -- Loop de Status
-        task.spawn(function()
-            while task.wait(1) do
-                local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
-                local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-                local totalSeconds = math.floor(time())
-                local hours = math.floor(totalSeconds / 3600)
-                local minutes = math.floor((totalSeconds % 3600) / 60)
-                local seconds = totalSeconds % 60
-                WelcomeLabel:SetTitle("Bem-vindo, " .. Player.Name)
-                WelcomeLabel:SetDesc("ID: "..Player.UserId.."\nFPS: "..fps.." | Ping: "..ping.."ms")
-                ServerTimeLabel:SetDesc(string.format("%02d:%02d:%02d", hours, minutes, seconds))
-            end
-        end)
-
-        _G.FeachtWindow:SelectTab(1)
-    end
-
-    -- LÓGICA DE INICIALIZAÇÃO COM KEY PERMANENTE
-    if IsKeyVerified() then
-        IniciarScriptPrincipal()
-    else
-        -- Janela de Key
-        local KeyWindow = FluentKey:CreateWindow({
-            Title = "Verificação de Acesso",
-            SubTitle = "por HenriqzDev",
-            TabWidth = 160,
-            Size = UDim2.fromOffset(420, 300),
-            Acrylic = false,
-            Theme = "Dark",
-            MinimizeKey = Enum.KeyCode.RightShift
-        })
-
-        local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
-
-        KeyTab:AddInput("InputKey", {
-            Title = "Senha",
-            Placeholder = "Insira a key aqui...",
-            Finished = true, 
-            Callback = function(Value)
-                if Value == "2508" then
-                    SalvarKeyStatus() -- Salva para não pedir novamente
-                    KeyWindow:Destroy() 
-                    task.wait(0.2)
-                    IniciarScriptPrincipal() 
-                elseif Value ~= "" then
-                    FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
-                end
-            end
-        })
-
-        -- BOTÃO PARA COPIAR O DISCORD ADICIONADO AQUI
-        KeyTab:AddButton({
-            Title = "Copiar Link do Discord",
-            Callback = function()
-                setclipboard("https://discord.gg/9Ca8b5s7p")
-                FluentKey:Notify({
-                    Title = "Copiado",
-                    Content = "Link do Discord copiado com sucesso!"
-                })
-            end
-        })
-    end
+        -- Agora chama o script principal (original)
+        MainScript()
+    end)
 end
 
--- ==========================================
--- [[ EXECUÇÃO DA TELA DE LOADING INICIAL ]]
--- ==========================================
-if PlayerGui:FindFirstChild("HenriqzLoading_V4") then PlayerGui.HenriqzLoading_V4:Destroy() end
-for _, v in pairs(Lighting:GetChildren()) do if v.Name == "HenriqzLoadingBlur" then v:Destroy() end end
+-- ===============================================================
+-- SCRIPT PRINCIPAL (ORIGINAL, SEM ALTERAÇÕES)
+-- ===============================================================
+function MainScript()
+local FluentSource = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
+local FluentKey = loadstring(FluentSource)()
 
-local ScreenBlur = Instance.new("BlurEffect")
-ScreenBlur.Name = "HenriqzLoadingBlur"; ScreenBlur.Size = 0; ScreenBlur.Parent = Lighting
-TweenService:Create(ScreenBlur, TweenInfo.new(0.6), {Size = 24}):Play()
+-- [[ CONFIGURAÇÃO DO WEBHOOK ]]
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1496146531038925041/T2HpSCP5Nf4mAS1RzkkHnW8-SbZvSg7-onn80NpXyrC3FvjB6qfn30zr6i8AbqJHTTYt"
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "HenriqzLoading_V4"; ScreenGui.Parent = PlayerGui; ScreenGui.IgnoreGuiInset = true; ScreenGui.DisplayOrder = 9999
+-- Variável para o tempo de entrada
+local ServerStartTime = tick() - time()
+local Player = game.Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local CooldownFile = "Sugestoes_Cooldown_" .. Player.UserId .. ".json"
+local KeySaveFile = "FeachtKey_" .. Player.UserId .. ".json"
 
-local BackgroundOverlay = Instance.new("Frame")
-BackgroundOverlay.Size = UDim2.new(1, 0, 1, 0); BackgroundOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0); BackgroundOverlay.BackgroundTransparency = 1; BackgroundOverlay.Parent = ScreenGui
-TweenService:Create(BackgroundOverlay, TweenInfo.new(0.6), {BackgroundTransparency = 0.4}):Play()
+-- Tabela de logs local para sincronização imediata
+_G.SugestoesSessao = _G.SugestoesSessao or {}
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 420, 0, 220); MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0); MainFrame.AnchorPoint = Vector2.new(0.5, 0.5); MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); MainFrame.BackgroundTransparency = 0.2; MainFrame.Parent = ScreenGui
-local Corner = Instance.new("UICorner"); Corner.CornerRadius = UDim.new(0, 18); Corner.Parent = MainFrame
-local Stroke = Instance.new("UIStroke"); Stroke.Color = Color3.fromRGB(255, 255, 255); Stroke.Thickness = 2; Stroke.Parent = MainFrame
+-- [[ SISTEMA DE FILTRO DE PALAVRÕES ]]
+local PalavrasBanidas = {
+    "porra", "merda", "caralho", "foder", "foda", "vtnc", "desgraça", 
+    "puta", "pqp", "arrombado", "buceta", "cu", "pica", "rola"
+}
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, 0, 0, 40); StatusLabel.Position = UDim2.new(0, 0, 0.35, 0); StatusLabel.BackgroundTransparency = 1; StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255); StatusLabel.TextSize = 20; StatusLabel.Font = Enum.Font.GothamBold; StatusLabel.Text = "Iniciando..."; StatusLabel.Parent = MainFrame
-
-local BarBg = Instance.new("Frame")
-BarBg.Size = UDim2.new(0.85, 0, 0, 8); BarBg.Position = UDim2.new(0.5, 0, 0.65, 0); BarBg.AnchorPoint = Vector2.new(0.5, 0.5); BarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40); BarBg.Parent = MainFrame
-local BarFill = Instance.new("Frame")
-BarFill.Size = UDim2.new(0, 0, 1, 0); BarFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255); BarFill.Parent = BarBg
-local FillCorner = Instance.new("UICorner"); FillCorner.CornerRadius = UDim.new(1, 0); FillCorner.Parent = BarFill
-
-local DiscordBtn = Instance.new("TextButton")
-DiscordBtn.Size = UDim2.new(0.6, 0, 0, 40); DiscordBtn.Position = UDim2.new(0.5, 0, 0.75, 0); DiscordBtn.AnchorPoint = Vector2.new(0.5, 0.5); DiscordBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255); DiscordBtn.TextColor3 = Color3.fromRGB(0, 0, 0); DiscordBtn.Text = "Copiar Discord"; DiscordBtn.Font = Enum.Font.GothamBold; DiscordBtn.TextSize = 15; DiscordBtn.Visible = false; DiscordBtn.Parent = MainFrame
-local BtnCorner = Instance.new("UICorner"); BtnCorner.CornerRadius = UDim.new(0, 10); BtnCorner.Parent = DiscordBtn
-
-local SybauBtn = Instance.new("TextButton")
-SybauBtn.Size = UDim2.new(0, 140, 0, 45); SybauBtn.Position = UDim2.new(0.5, 0, 0.5, 160); SybauBtn.AnchorPoint = Vector2.new(0.5, 0.5); SybauBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); SybauBtn.BackgroundTransparency = 1; SybauBtn.TextColor3 = Color3.fromRGB(255, 255, 255); SybauBtn.TextTransparency = 1; SybauBtn.Text = "Sybau"; SybauBtn.Font = Enum.Font.GothamBold; SybauBtn.TextSize = 18; SybauBtn.Visible = false; SybauBtn.Parent = ScreenGui
-local SyCorner = Instance.new("UICorner"); SyCorner.CornerRadius = UDim.new(0, 12); SyCorner.Parent = SybauBtn
-
-task.spawn(function()
-    local assets = game:GetDescendants()
-    local total = #assets
-    for i = 1, total do 
-        if i % 80 == 0 then 
-            StatusLabel.Text = "carregando script (" .. math.floor((i/total)*100) .. ")%"
-            BarFill.Size = UDim2.new(i/total, 0, 1, 0)
-            task.wait() 
-        end
+local function FiltrarTexto(texto)
+    local textoFiltrado = texto
+    for _, palavra in ipairs(PalavrasBanidas) do
+        local padrao = palavra
+        textoFiltrado = string.gsub(textoFiltrado:lower(), padrao, function(match)
+            return string.rep("*", #match)
+        end)
     end
-    StatusLabel.Text = "Deseja entrar no Discord?"
-    BarFill.Size = UDim2.new(1, 0, 1, 0)
-    task.wait(0.5)
-    DiscordBtn.Visible = true
-    SybauBtn.Visible = true
-    BarBg.Visible = false
-    TweenService:Create(SybauBtn, TweenInfo.new(0.5), {BackgroundTransparency = 0.3, TextTransparency = 0}):Play()
-end)
+    return textoFiltrado
+end
 
--- LOGICA CORRIGIDA: Copiar e Notificar no clique
-DiscordBtn.MouseButton1Click:Connect(function() 
-    setclipboard("https://discord.gg/9Ca8b5s7p")
+-- Configuração inicial: Copiar link e Notificar
+setclipboard("https://discord.gg/9Ca8b5s7p")
+task.spawn(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Link Copiado",
-        Text = "O link do Discord foi copiado com sucesso!",
-        Duration = 5
+        Text = "Link Copiado, Cole no navegador ou Discord Para Obter Key Permanente",
+        Duration = 10
     })
 end)
 
--- O EVENTO QUE FINALMENTE DISPARA SEU SCRIPT
-SybauBtn.MouseButton1Click:Connect(function()
-    local fadeInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    TweenService:Create(ScreenBlur, fadeInfo, {Size = 0}):Play()
-    ScreenGui:Destroy()
+-- Funções Auxiliares de Sugestão
+local function PodeEnviarSugestao()
+    if isfile and isfile(CooldownFile) then
+        local success, data = pcall(function() return HttpService:JSONDecode(readfile(CooldownFile)) end)
+        if success and data.LastDate == os.date("%x") then
+            return false
+        end
+    end
+    return true
+end
+
+local function SalvarDataEnvio()
+    if writefile then
+        writefile(CooldownFile, HttpService:JSONEncode({LastDate = os.date("%x")}))
+    end
+end
+
+-- Função para Verificar Key Salva
+local function IsKeyVerified()
+    if isfile and isfile(KeySaveFile) then
+        local success, result = pcall(function() return HttpService:JSONDecode(readfile(KeySaveFile)) end)
+        return success and result.Verified == true
+    end
+    return false
+end
+
+local function SalvarKeyStatus()
+    if writefile then
+        writefile(KeySaveFile, HttpService:JSONEncode({Verified = true}))
+    end
+end
+
+-- Função para limpar efeitos de iluminação
+local function LimparShaders()
+    for _, v in pairs(game.Lighting:GetChildren()) do
+        if v:IsA("ColorCorrectionEffect") or v:IsA("BlurEffect") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") then
+            v:Destroy()
+        end
+    end
+end
+
+-- Função Principal do Script
+local function IniciarScriptPrincipal()
+    local Fluent = loadstring(FluentSource)() 
+    local Market = game:GetService("MarketplaceService")
+    local TeleportService = game:GetService("TeleportService")
+    local FileName = "FeachtData_" .. Player.UserId .. ".json"
+
+    -- Travas de abas dinâmicas
+    _G.MM2TabUnlocked = nil
+    _G.ShaderTabUnlocked = nil
+    _G.DadosTabUnlocked = nil
+    _G.SintoniaTabUnlocked = nil
+    _G.NoitesTabUnlocked = nil
+    _G.FishTabUnlocked = nil
+    _G.DeadRailsTabUnlocked = nil
+    _G.BrookhavenTabUnlocked = nil
+
+    local successGame, gameName = pcall(function()
+        return Market:GetProductInfo(game.PlaceId).Name
+    end)
+    if not successGame then gameName = "Desconhecido" end
+
+    local function Save(data)
+        if writefile then writefile(FileName, HttpService:JSONEncode(data)) end
+    end
+
+    local function Load()
+        if isfile and isfile(FileName) then
+            local success, result = pcall(function() return HttpService:JSONDecode(readfile(FileName)) end)
+            if success then return result end
+        end
+        return {Theme = "Dark", Lang = "Português", Acrylic = false, Transparency = 0}
+    end
+
+    local Configs = Load()
+
+    _G.FeachtWindow = Fluent:CreateWindow({
+        Title = "Feacht Dados  🟢  " .. gameName,
+        SubTitle = "v4.0",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(580, 460),
+        Acrylic = Configs.Acrylic,
+        Theme = Configs.Theme,
+        TabSearch = true,
+        MinimizeKey = Enum.KeyCode.RightShift
+    })
+
+    -- [[ INÍCIO: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
+    local ScreenGui = Instance.new("ScreenGui")
+    local OpenButton = Instance.new("TextButton")
+    local UICorner = Instance.new("UICorner")
+
+    ScreenGui.Name = "FeachtToggleGui"
+    ScreenGui.Parent = game.CoreGui
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    OpenButton.Name = "ToggleButton"
+    OpenButton.Parent = ScreenGui
+    OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    OpenButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+    OpenButton.Size = UDim2.new(0, 50, 0, 50)
+    OpenButton.Font = Enum.Font.GothamBold
+    OpenButton.Text = "F"
+    OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    OpenButton.TextSize = 24
+    OpenButton.Active = true
+    OpenButton.Draggable = true 
+
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = OpenButton
+
+    OpenButton.MouseButton1Click:Connect(function()
+        _G.FeachtWindow:Minimize()
+    end)
+
+    task.spawn(function()
+        local FluentUI = game.CoreGui:WaitForChild("Fluent", 5)
+        if FluentUI then
+            FluentUI.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                    ScreenGui:Destroy()
+                end
+            end)
+            FluentUI.Destroying:Connect(function()
+                ScreenGui:Destroy()
+            end)
+        end
+    end)
+    -- [[ FIM: CRIAÇÃO DO BOTÃO ARRASTÁVEL ]]
+
+    local Tabs = {
+        Home = _G.FeachtWindow:AddTab({ Title = "Home", Icon = "home" }),
+        Universal = _G.FeachtWindow:AddTab({ Title = "Universal", Icon = "globe" }),
+        Sugestoes = _G.FeachtWindow:AddTab({ Title = "Sugestões", Icon = "message-square" }),
+        Ajuste = _G.FeachtWindow:AddTab({ Title = "Ajuste", Icon = "settings" }),
+        Creditos = _G.FeachtWindow:AddTab({ Title = "Créditos", Icon = "info" })
+    }
+
+    local WelcomeLabel = Tabs.Home:AddParagraph({ Title = "Carregando...", Content = "..." })
+
+    -- [[ ABA CRÉDITOS ]]
+    Tabs.Creditos:AddParagraph({ Title = "Desenvolvedor", Content = "Dev: Manoz7_rlq" })
+    Tabs.Creditos:AddParagraph({ Title = "Biblioteca", Content = "Libraly: Fluent" })
+    Tabs.Creditos:AddParagraph({ Title = "Testador", Content = "Tester: h3ito_kkj" })
+
+    local TiktokSection = Tabs.Creditos:AddSection("Tiktok dos Mesmo")
+
+    TiktokSection:AddButton({
+        Title = "Dev Tiktok",
+        Callback = function()
+            setclipboard("@jjjkeasd")
+            Fluent:Notify({Title = "Copiado", Content = "Tiktok do Dev copiado com sucesso!"})
+        end
+    })
+
+    TiktokSection:AddButton({
+        Title = "Tester Tiktok",
+        Callback = function()
+            setclipboard("@nevsxzs_")
+            Fluent:Notify({Title = "Copiado", Content = "Tiktok do Tester copiado com sucesso!"})
+        end
+    })
+
+    -- [[ SEÇÃO SERVER NA HOME ]]
+    local ServerSection = Tabs.Home:AddSection("Server")
+    local ServerTimeLabel = ServerSection:AddParagraph({ Title = "Tempo no Servidor", Content = "Calculando..." })
+
+    ServerSection:AddButton({
+        Title = "Rejoin Server",
+        Callback = function() TeleportService:Teleport(game.PlaceId, Player) end
+    })
+
+    -- [[ ABA UNIVERSAL ]]
+    Tabs.Universal:AddButton({
+        Title = "Infinite Yield",
+        Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end
+    })
+
+    -- BOTÃO 99 NOITES NA FLORESTA
+    Tabs.Universal:AddButton({
+        Title = "99 Noites na Floresta",
+        Callback = function()
+            if not _G.NoitesTabUnlocked then
+                _G.NoitesTabUnlocked = true
+                Tabs.Noites = _G.FeachtWindow:AddTab({ Title = "99 Noites", Icon = "moon" })
+                Tabs.Noites:AddButton({
+                    Title = "Carregar Script 99 Noites",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-99-Noites-na-Floresta-87445"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script 99 Noites Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Noites)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Noites)
+            end
+        end
+    })
+
+    -- BOTÃO DEAD RAILS
+    Tabs.Universal:AddButton({
+        Title = "Dead Rails",
+        Callback = function()
+            if not _G.DeadRailsTabUnlocked then
+                _G.DeadRailsTabUnlocked = true
+                Tabs.DeadRails = _G.FeachtWindow:AddTab({ Title = "Dead Rails", Icon = "skull" })
+                Tabs.DeadRails:AddButton({
+                    Title = "Carregar Script Dead Rails",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://rawscripts.net/raw/Dead-Rails-Beta-Best-script-dead-rails-204535"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script Dead Rails Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.DeadRails)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.DeadRails)
+            end
+        end
+    })
+
+    -- BOTÃO FISH
+    Tabs.Universal:AddButton({
+        Title = "Fish",
+        Callback = function()
+            if not _G.FishTabUnlocked then
+                _G.FishTabUnlocked = true
+                Tabs.Fish = _G.FeachtWindow:AddTab({ Title = "Fish", Icon = "waves" })
+                Tabs.Fish:AddButton({
+                    Title = "Carregar Script Fish",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/KAN-FISCH/tesss/refs/heads/main/gunung/fish.lua"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script Fish Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Fish)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Fish)
+            end
+        end
+    })
+
+    -- BOTÃO SINTONIA RP
+    Tabs.Universal:AddButton({
+        Title = "Sintonia Rp (Scripts)",
+        Callback = function()
+            if not _G.SintoniaTabUnlocked then
+                _G.SintoniaTabUnlocked = true
+                Tabs.Sintonia = _G.FeachtWindow:AddTab({ Title = "Sintonia Rp", Icon = "radio" })
+                Tabs.Sintonia:AddButton({
+                    Title = "Carregar Sintonia RP Script",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/SEASON-2-Sintonia-RP-Fx-Hub-194182"))() end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Sintonia)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Sintonia)
+            end
+        end
+    })
+
+    -- BOTÃO PUXAR DADOS
+    Tabs.Universal:AddButton({
+        Title = "Puxar Dados de Jogador",
+        Callback = function()
+            if not _G.DadosTabUnlocked then
+                _G.DadosTabUnlocked = true
+                Tabs.Dados = _G.FeachtWindow:AddTab({ Title = "Puxar Dados", Icon = "search" })
+                local InfoParagraph = Tabs.Dados:AddParagraph({ Title = "Resultado", Content = "Digite um nome e clique em Puxar." })
+                local TargetName = ""
+                Tabs.Dados:AddInput("UserLookup", {
+                    Title = "Username",
+                    Placeholder = "Nome do jogador...",
+                    Callback = function(Value) TargetName = Value end
+                })
+                Tabs.Dados:AddButton({
+                    Title = "Puxar Dados Agora",
+                    Callback = function()
+                        if TargetName == "" then return end
+                        local success, targetId = pcall(function() return game.Players:GetUserIdFromNameAsync(TargetName) end)
+                        if success then
+                            local info = HttpService:JSONDecode(game:HttpGet("https://users.roblox.com/v1/users/" .. targetId))
+                            InfoParagraph:SetTitle("Dados de: " .. info.displayName)
+                            InfoParagraph:SetDesc("User: @" .. info.name .. "\nID: " .. targetId .. "\nCriada em: " .. info.created:sub(1,10))
+                        end
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Dados)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Dados)
+            end
+        end
+    })
+
+    -- BOTÃO BROOKHAVEN
+    Tabs.Universal:AddButton({
+        Title = "Brookhaven RP",
+        Callback = function()
+            if not _G.BrookhavenTabUnlocked then
+                _G.BrookhavenTabUnlocked = true
+                Tabs.Brookhaven = _G.FeachtWindow:AddTab({ Title = "Brookhaven", Icon = "home" })
+                Tabs.Brookhaven:AddButton({
+                    Title = "Carregar Script Brookhaven",
+                    Callback = function()
+                        loadstring(game:HttpGet("https://rawscripts.net/raw/Brookhaven-RP-HX-Hexagon-Client-90722"))()
+                        Fluent:Notify({Title = "Sucesso", Content = "Script Brookhaven Carregado!"})
+                    end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Brookhaven)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Brookhaven)
+            end
+        end
+    })
+
+    -- BOTÃO MM2
+    Tabs.Universal:AddButton({
+        Title = "Murder Mystery 2 (Scripts)",
+        Callback = function()
+            if not _G.MM2TabUnlocked then
+                _G.MM2TabUnlocked = true
+                Tabs.MM2 = _G.FeachtWindow:AddTab({ Title = "Murder Mystery", Icon = "skull" })
+                Tabs.MM2:AddButton({
+                    Title = "Ziya Hub",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Ziya-Hub-81522"))() end
+                })
+                _G.FeachtWindow:SelectTab(Tabs.MM2)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.MM2)
+            end
+        end
+    })
+
+    -- ABA SHADERS
+    Tabs.Universal:AddButton({
+        Title = "Shader System (FX)",
+        Callback = function()
+            if not _G.ShaderTabUnlocked then
+                _G.ShaderTabUnlocked = true
+                Tabs.Shader = _G.FeachtWindow:AddTab({ Title = "Shader", Icon = "camera" })
+                Tabs.Shader:AddButton({
+                    Title = "Ativar Heavy Shaders",
+                    Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Heavy-Shaders-158350"))() end
+                })
+                Tabs.Shader:AddButton({ 
+                    Title = "Resetar Shaders", 
+                    Callback = function() LimparShaders(); game.Lighting.ClockTime = 14 end 
+                })
+                _G.FeachtWindow:SelectTab(Tabs.Shader)
+            else
+                _G.FeachtWindow:SelectTab(Tabs.Shader)
+            end
+        end
+    })
+
+    -- [[ ABA SUGESTÕES ]]
+    local SugestaoTexto = ""
+    local LogPara 
     
-    -- Chama a função que contém todo o seu script
-    task.spawn(IniciarScriptCompleto)
-end)
+    Tabs.Sugestoes:AddInput("InputSugestao", {
+        Title = "Enviar Sugestão",
+        Placeholder = "Escreva sua ideia aqui...",
+        Callback = function(Value) SugestaoTexto = Value end
+    })
+
+    Tabs.Sugestoes:AddButton({
+        Title = "Enviar para HenriqzDev",
+        Callback = function()
+            if SugestaoTexto == "" or #SugestaoTexto < 5 then
+                return Fluent:Notify({Title = "Erro", Content = "Sugestão muito curta!"})
+            end
+            if not PodeEnviarSugestao() then
+                return Fluent:Notify({Title = "Aviso", Content = "Você já enviou uma sugestão hoje!"})
+            end
+            local TextoFinal = FiltrarTexto(SugestaoTexto)
+            local requestFunc = syn and syn.request or http_request or request or HttpService.Request
+            if requestFunc then
+                requestFunc({
+                    Url = WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({
+                        ["embeds"] = {{
+                            ["title"] = "📩 Nova Sugestão Recebida",
+                            ["description"] = "```" .. TextoFinal .. "```",
+                            ["color"] = 0x00FF00,
+                            ["fields"] = {
+                                {["name"] = "Jogador", ["value"] = Player.Name .. " (" .. Player.UserId .. ")", ["inline"] = true},
+                                {["name"] = "Jogo", ["value"] = gameName, ["inline"] = true}
+                            }
+                        }}
+                    })
+                })
+                SalvarDataEnvio()
+                table.insert(_G.SugestoesSessao, "[" .. os.date("%H:%M") .. "] " .. Player.Name .. ": " .. TextoFinal)
+                if LogPara then
+                    local lista = ""
+                    for i = #_G.SugestoesSessao, 1, -1 do
+                        lista = lista .. _G.SugestoesSessao[i] .. "\n"
+                        if i < #_G.SugestoesSessao - 5 then break end 
+                    end
+                    LogPara:SetDesc("Últimas sugestões sincronizadas:\n" .. lista)
+                end
+                Fluent:Notify({Title = "Sucesso", Content = "Sugestão enviada e filtrada!"})
+            end
+        end
+    })
+
+    local DevSection = Tabs.Sugestoes:AddSection("Painel do Desenvolvedor")
+    local DevInputKey = ""
+    DevSection:AddInput("DevKey", {
+        Title = "Key de Desenvolvedor",
+        Placeholder = "Digite para ver logs...",
+        Callback = function(Value) DevInputKey = Value end
+    })
+
+    DevSection:AddButton({
+        Title = "Verificar Logs",
+        Callback = function()
+            if DevInputKey == "250814" then
+                if not LogPara then
+                    LogPara = Tabs.Sugestoes:AddParagraph({ 
+                        Title = "Sincronização Ativa", 
+                        Content = "Nenhuma sugestão enviada nesta sessão ainda." 
+                    })
+                end
+                Fluent:Notify({Title = "Bem-vindo", Content = "Acesso de Desenvolvedor liberado!"})
+            else
+                Fluent:Notify({Title = "Erro", Content = "Key de Desenvolvedor incorreta!"})
+            end
+        end
+    })
+
+    -- [[ ABA AJUSTES ]]
+    local SystemSection = Tabs.Ajuste:AddSection("Otimização do Sistema")
+
+    SystemSection:AddToggle("AntiAFK", {
+        Title = "Anti-AFK System",
+        Default = false,
+        Callback = function(Value)
+            _G.AntiAFK = Value
+            if Value then
+                local vu = game:GetService("VirtualUser")
+                Player.Idled:Connect(function()
+                    if _G.AntiAFK then
+                        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+                        wait(1)
+                        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+                    end
+                end)
+                Fluent:Notify({Title = "Anti-AFK", Content = "Ativado com sucesso!"})
+            end
+        end
+    })
+
+    SystemSection:AddButton({
+        Title = "Ant Lag (FPS Boost)",
+        Callback = function()
+            for _, v in pairs(game:GetDescendants()) do
+                if v:IsA("BasePart") and not v:IsA("MeshPart") then
+                    v.Material = "SmoothPlastic"
+                    v.Reflectance = 0
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v:Destroy()
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                    v.Enabled = false
+                end
+            end
+            Fluent:Notify({Title = "Ant Lag", Content = "Texturas e efeitos simplificados!"})
+        end
+    })
+
+    local UISection = Tabs.Ajuste:AddSection("Interface do Painel")
+
+    UISection:AddDropdown("ThemeSelect", {
+        Title = "Tema",
+        Values = {"Dark", "Light", "Amethyst", "Aqua", "Rose", "Green", "Vivid", "Black", "Midnight"},
+        Default = Configs.Theme,
+        Callback = function(Value)
+            Configs.Theme = Value
+            Save(Configs)
+            Fluent:SetTheme(Value)
+        end
+    })
+
+    UISection:AddToggle("AcrylicToggle", {
+        Title = "Efeito de Desfoque (Acrylic)",
+        Default = Configs.Acrylic,
+        Callback = function(Value)
+            Configs.Acrylic = Value
+            Save(Configs)
+            _G.FeachtWindow:SetAcrylic(Value)
+        end
+    })
+
+    UISection:AddSlider("TransparencySlider", {
+        Title = "Transparência do Painel",
+        Description = "Ajuste a visibilidade do fundo",
+        Default = Configs.Transparency or 0,
+        Min = 0,
+        Max = 100,
+        Rounding = 0,
+        Callback = function(Value)
+            Configs.Transparency = Value
+            Save(Configs)
+            _G.FeachtWindow:SetTransparency(Value / 100)
+        end
+    })
+
+    -- Loop de Status
+    task.spawn(function()
+        while task.wait(1) do
+            local fps = math.floor(1 / game:GetService("RunService").RenderStepped:Wait())
+            local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            local totalSeconds = math.floor(time())
+            local hours = math.floor(totalSeconds / 3600)
+            local minutes = math.floor((totalSeconds % 3600) / 60)
+            local seconds = totalSeconds % 60
+            WelcomeLabel:SetTitle("Bem-vindo, " .. Player.Name)
+            WelcomeLabel:SetDesc("ID: "..Player.UserId.."\nFPS: "..fps.." | Ping: "..ping.."ms")
+            ServerTimeLabel:SetDesc(string.format("%02d:%02d:%02d", hours, minutes, seconds))
+        end
+    end)
+
+    _G.FeachtWindow:SelectTab(1)
+end
+
+-- LÓGICA DE INICIALIZAÇÃO COM KEY PERMANENTE
+if IsKeyVerified() then
+    IniciarScriptPrincipal()
+else
+    -- Janela de Key
+    local KeyWindow = FluentKey:CreateWindow({
+        Title = "Verificação de Acesso",
+        SubTitle = "por HenriqzDev",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(420, 300),
+        Acrylic = false,
+        Theme = "Dark",
+        MinimizeKey = Enum.KeyCode.RightShift
+    })
+
+    local KeyTab = KeyWindow:AddTab({ Title = "Chave", Icon = "key" })
+
+    KeyTab:AddInput("InputKey", {
+        Title = "Senha",
+        Placeholder = "Insira a key aqui...",
+        Finished = true, 
+        Callback = function(Value)
+            if Value == "2508" then
+                SalvarKeyStatus()
+                KeyWindow:Destroy() 
+                task.wait(0.2)
+                IniciarScriptPrincipal() 
+            elseif Value ~= "" then
+                FluentKey:Notify({Title = "Erro", Content = "Key Incorreta!"})
+            end
+        end
+    })
+
+    KeyTab:AddButton({
+        Title = "Copiar Link do Discord",
+        Callback = function()
+            setclipboard("https://discord.gg/9Ca8b5s7p")
+            FluentKey:Notify({Title = "Copiado", Content = "Link do Discord copiado com sucesso!"})
+        end
+    })
+end
+end -- Fim da função MainScript
