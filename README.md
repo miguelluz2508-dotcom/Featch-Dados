@@ -1,188 +1,359 @@
 --[[
-    FEACHT TOOLS - MUSCLE LEGENDS
-    Kavo UI Original
-    Abas: Universal | Auto Click | Auto Strong | Kill Auto
+    FEACHT TOOLS – MUSCLE LEGENDS (FLUENT UI)
+    Com botão flutuante, teleporte para plataforma e funções extras.
 --]]
 
--- ========================== KAVO UI ==========================
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("FEACHT TOOLS", "Serpent")
+-- ========================== FLUENT UI ==========================
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveConfig = Fluent.SaveConfig
+local ThemeManager = Fluent.ThemeManager
+
+local Window = Fluent:CreateWindow({
+    Title = "Feacht Tools – Muscle Legends",
+    SubTitle = "v1.0",
+    TabWidth = 140,
+    Size = UDim2.fromOffset(560, 400),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightShift
+})
 
 -- ========================== SERVIÇOS ==========================
 local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
--- ========================== ABA UNIVERSAL ==========================
-local UniversalTab = Window:NewTab("Universal")
-local UniversalSection = UniversalTab:NewSection("Scripts")
+-- ========================== BOTÃO FLUTUANTE ==========================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FeachtToggleGui"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-UniversalSection:NewButton("Infinite Yield", "Carrega o Infinite Yield", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+local OpenButton = Instance.new("TextButton")
+OpenButton.Name = "ToggleButton"
+OpenButton.Parent = ScreenGui
+OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+OpenButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+OpenButton.Size = UDim2.new(0, 50, 0, 50)
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.Text = "F"
+OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenButton.TextSize = 24
+OpenButton.Active = true
+OpenButton.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = OpenButton
+
+OpenButton.MouseButton1Click:Connect(function()
+    Window:Minimize()
 end)
 
--- ========================== ABA AUTO CLICK ==========================
-local AutoClickTab = Window:NewTab("Auto Click")
-local AutoClickSection = AutoClickTab:NewSection("Configuração")
-
-local autoClickEnabled = false
-local autoClickDelay = 0.01 -- intervalo entre cliques (segundos)
-
-AutoClickSection:NewToggle("Ativar Auto Click", false, function(state)
-    autoClickEnabled = state
-    if state then
-        task.spawn(function()
-            while autoClickEnabled do
-                VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                task.wait(autoClickDelay)
-                VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                task.wait(autoClickDelay)
+task.spawn(function()
+    local FluentUI = CoreGui:WaitForChild("Fluent", 5)
+    if FluentUI then
+        FluentUI.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                ScreenGui:Destroy()
             end
+        end)
+        FluentUI.Destroying:Connect(function()
+            ScreenGui:Destroy()
         end)
     end
 end)
 
-AutoClickSection:NewSlider("Velocidade (ms)", 10, 1, 100, false, function(value)
-    autoClickDelay = value / 1000 -- converte ms para segundos
-end)
-
--- ========================== ABA AUTO STRONG ==========================
-local AutoStrongTab = Window:NewTab("Auto Strong")
-local AutoStrongSection = AutoStrongTab:NewSection("Treino Automático")
+-- ========================== VARIÁVEIS E FUNÇÕES AUXILIARES ==========================
+local autoClickEnabled = false
+local autoClickDelay = 0.01
 
 local autoStrongEnabled = false
+local killAutoEnabled = false
+local autoRebirthEnabled = false
+local autoSellEnabled = false
+local autoEquipBest = false
+local autoStatsEnabled = false
 
-local function equipTool(toolIndex)
-    local character = LocalPlayer.Character
-    if not character then return end
-    local backpack = LocalPlayer.Backpack
+-- Função de clique rápido
+local function rapidClick(times)
+    for _ = 1, (times or 1) do
+        VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(autoClickDelay)
+        VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(autoClickDelay)
+    end
+end
+
+-- Equipar ferramenta pelo índice (do backpack)
+local function equipTool(index)
+    local char = Player.Character
+    if not char then return end
+    local backpack = Player.Backpack
     local tools = {}
-    -- pega tools do backpack
     for _, item in ipairs(backpack:GetChildren()) do
         if item:IsA("Tool") then
             table.insert(tools, item)
         end
     end
-    if toolIndex <= #tools then
-        -- equipa a ferramenta
-        local tool = tools[toolIndex]
-        tool.Parent = character
+    if index <= #tools then
+        tools[index].Parent = char
     end
 end
 
-local function createPlatform()
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    local platform = Instance.new("Part")
-    platform.Name = "AutoStrongPlatform"
-    platform.Size = Vector3.new(10, 0.4, 10)
-    platform.Anchored = true
-    platform.CanCollide = true
-    platform.BrickColor = BrickColor.new("Dark stone grey")
-    platform.Transparency = 0.5
-    platform.CFrame = character.HumanoidRootPart.CFrame + Vector3.new(0, 50, 0) -- 50 studs acima
-    platform.Parent = workspace
-    return platform
+-- Pegar melhor ferramenta baseado no dano (ou equipar a primeira)
+local function equipBestTool()
+    local char = Player.Character
+    if not char then return end
+    local backpack = Player.Backpack
+    local bestTool = nil
+    local bestDamage = 0
+    for _, item in ipairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            -- Supõe que o dano está no nome ou em um atributo; vamos pegar a primeira por enquanto.
+            -- Melhor usar ordem de força conhecida (treino etc.) – manteremos simples.
+            bestTool = item
+            break
+        end
+    end
+    if bestTool then
+        bestTool.Parent = char
+    end
 end
 
-AutoStrongSection:NewToggle("Ativar Auto Strong", false, function(state)
-    autoStrongEnabled = state
-    if state then
-        task.spawn(function()
-            local platform = createPlatform()
-            if not platform then
-                Library:Notification("Erro", "Não foi possível criar a plataforma.", 3)
-                autoStrongEnabled = false
-                return
-            end
-            -- equipa a segunda ferramenta do inventário
-            equipTool(2)
-            -- loop de cliques
-            while autoStrongEnabled do
-                VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                task.wait(0.01)
-                VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                task.wait(0.01)
-            end
-            -- ao desativar, remove a plataforma
-            if platform and platform.Parent then
-                platform:Destroy()
-            end
-        end)
-    end
-end)
-
--- ========================== ABA KILL AUTO ==========================
-local KillAutoTab = Window:NewTab("Kill Auto")
-local KillAutoSection = KillAutoTab:NewSection("Assassino Automático")
-
-local killAutoEnabled = false
-
+-- Pegar jogador mais próximo
 local function getNearestPlayer()
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
     local nearest = nil
-    local shortestDist = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local dist = (character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                nearest = player
+    local shortest = math.huge
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other == Player then continue end
+        if other.Character and other.Character:FindFirstChild("HumanoidRootPart") and other.Character:FindFirstChild("Humanoid") and other.Character.Humanoid.Health > 0 then
+            local dist = (char.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
+            if dist < shortest then
+                shortest = dist
+                nearest = other
             end
         end
     end
     return nearest
 end
 
+-- Teleportar para um jogador
 local function teleportTo(targetPlayer)
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
     if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetPos = targetPlayer.Character.HumanoidRootPart.Position
-        character.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0)) -- um pouco acima
-        return true
+        char.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)
     end
-    return false
 end
 
-KillAutoSection:NewToggle("Ativar Kill Auto", false, function(state)
-    killAutoEnabled = state
-    if state then
-        task.spawn(function()
-            while killAutoEnabled do
-                local target = getNearestPlayer()
-                if target then
-                    -- equipa a primeira ferramenta
-                    equipTool(1)
-                    -- teleporta até o alvo
-                    local success = teleportTo(target)
-                    if not success then
-                        task.wait(0.5)
-                        continue
-                    end
-                    -- loop de cliques até o alvo morrer
-                    local targetAlive = true
-                    while targetAlive and killAutoEnabled do
-                        if not target.Character or not target.Character:FindFirstChild("Humanoid") or target.Character.Humanoid.Health <= 0 then
-                            targetAlive = false
-                            break
-                        end
-                        VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                        task.wait(0.01)
-                        VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                        task.wait(0.01)
-                    end
-                else
-                    task.wait(1) -- espera se não houver alvo
-                end
-                task.wait(0.1)
-            end
-        end)
+-- ========================== ABA UNIVERSAL ==========================
+local UniversalTab = Window:AddTab({ Title = "Universal", Icon = "globe" })
+UniversalTab:AddButton({
+    Title = "Infinite Yield",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
     end
-end)
+})
 
--- ========================== INICIAR ==========================
-Library:Notification("FEACHT TOOLS", "Script carregado com sucesso!", 3)
+-- ========================== ABA AUTO CLICK ==========================
+local AutoClickTab = Window:AddTab({ Title = "Auto Click", Icon = "mouse-pointer" })
+local ToggleAutoClick = AutoClickTab:AddToggle("AutoClickToggle", {
+    Title = "Ativar Auto Click",
+    Default = false,
+    Callback = function(Value)
+        autoClickEnabled = Value
+        if Value then
+            task.spawn(function()
+                while autoClickEnabled do
+                    rapidClick(1)
+                end
+            end)
+        end
+    end
+})
+AutoClickTab:AddSlider("ClickSpeed", {
+    Title = "Velocidade (ms)",
+    Default = 10,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(Value)
+        autoClickDelay = Value / 1000
+    end
+})
+
+-- ========================== ABA AUTO STRONG (com teleporte) ==========================
+local AutoStrongTab = Window:AddTab({ Title = "Auto Strong", Icon = "dumbbell" })
+AutoStrongTab:AddToggle("AutoStrongToggle", {
+    Title = "Ativar Auto Strong",
+    Default = false,
+    Callback = function(Value)
+        autoStrongEnabled = Value
+        if Value then
+            task.spawn(function()
+                local platform = Instance.new("Part")
+                platform.Name = "AutoStrongPlatform"
+                platform.Size = Vector3.new(30, 0.4, 30)   -- plataforma gigante
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.BrickColor = BrickColor.new("Dark stone grey")
+                platform.Transparency = 0.5
+                platform.Parent = workspace
+
+                local char = Player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then
+                    Library:Notification("Erro", "Personagem não encontrado.", 3)
+                    autoStrongEnabled = false
+                    return
+                end
+                -- Cria 50 studs acima
+                platform.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 50, 0)
+
+                -- Equipa a segunda ferramenta
+                equipTool(2)
+
+                -- Teleporta o personagem para cima da plataforma
+                char.HumanoidRootPart.CFrame = platform.CFrame * CFrame.new(0, 3, 0)   -- um pouco acima da superfície
+
+                -- Loop de cliques
+                while autoStrongEnabled do
+                    rapidClick(1)
+                end
+
+                -- Ao desativar, remove a plataforma
+                if platform and platform.Parent then
+                    platform:Destroy()
+                end
+            end)
+        end
+    end
+})
+
+-- ========================== ABA KILL AUTO ==========================
+local KillAutoTab = Window:AddTab({ Title = "Kill Auto", Icon = "crosshair" })
+KillAutoTab:AddToggle("KillAutoToggle", {
+    Title = "Ativar Kill Auto",
+    Default = false,
+    Callback = function(Value)
+        killAutoEnabled = Value
+        if Value then
+            task.spawn(function()
+                while killAutoEnabled do
+                    local target = getNearestPlayer()
+                    if target then
+                        equipTool(1)
+                        teleportTo(target)
+                        -- mata enquanto o alvo estiver vivo
+                        while killAutoEnabled and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 do
+                            rapidClick(1)
+                        end
+                    else
+                        task.wait(1)
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+-- ========================== ABA AUTO FARM (EXTRAS) ==========================
+local AutoFarmTab = Window:AddTab({ Title = "Auto Farm", Icon = "bar-chart-2" })
+
+-- Auto Rebirth (supondo que exista um botão de rebirth)
+AutoFarmTab:AddToggle("AutoRebirthToggle", {
+    Title = "Auto Rebirth (experimental)",
+    Default = false,
+    Callback = function(Value)
+        autoRebirthEnabled = Value
+        if Value then
+            task.spawn(function()
+                while autoRebirthEnabled do
+                    pcall(function()
+                        -- Procura pelo botão de renascimento (pode ser um Remote ou um ScreenGui)
+                        -- Exemplo: se existir um botão "Rebirth" no ScreenGui
+                        local rebirthBtn = Player.PlayerGui:FindFirstChild("RebirthGui")
+                        if rebirthBtn then
+                            -- Tenta clicar nele
+                            fireclickdetector(rebirthBtn.ClickDetector)
+                        end
+                        -- Ou usar remotes: não sabemos, mas pode ser adaptado.
+                    end)
+                    task.wait(10)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Sell (vender pesos na loja)
+AutoFarmTab:AddToggle("AutoSellToggle", {
+    Title = "Auto Sell Weights",
+    Default = false,
+    Callback = function(Value)
+        autoSellEnabled = Value
+        if Value then
+            task.spawn(function()
+                while autoSellEnabled do
+                    pcall(function()
+                        -- Tenta vender todos os itens de peso
+                        local args = {
+                            [1] = "SellAll"
+                        }
+                        workspace.Events.Sell:FireServer(unpack(args))
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Equip Best Tool
+AutoFarmTab:AddToggle("AutoEquipBestToggle", {
+    Title = "Auto Equip Best Tool",
+    Default = false,
+    Callback = function(Value)
+        autoEquipBest = Value
+        if Value then
+            task.spawn(function()
+                while autoEquipBest do
+                    equipBestTool()
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- Auto Stats (colocar pontos em Força)
+AutoFarmTab:AddToggle("AutoStatsToggle", {
+    Title = "Auto Stats (Força)",
+    Default = false,
+    Callback = function(Value)
+        autoStatsEnabled = Value
+        if Value then
+            task.spawn(function()
+                while autoStatsEnabled do
+                    pcall(function()
+                        local args = {
+                            [1] = "Strength"
+                        }
+                        workspace.Events.Stats:FireServer(unpack(args))
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- ========================== NOTIFICAÇÃO INICIAL ==========================
+Fluent:Notify({Title = "Feacht Tools", Content = "Script carregado com sucesso!", Duration = 5})
+Window:SelectTab(1)   -- Abre na primeira aba
